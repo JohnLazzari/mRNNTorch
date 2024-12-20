@@ -1,0 +1,180 @@
+{
+
+    "__comment_regions": [
+        "Structure of regions key:",
+        "[",
+        "name: str",
+        "num_units: int",
+        "base_firing: float",
+        "cell_types: dict (key is cell type name, value is float for percentage of units for corresponding cell type)",
+        "]"
+
+    ],
+
+    "recurrent_regions": [
+      {
+        "name": "striatum",
+        "num_units": 100,
+        "base_firing": 0,
+        "cell_types": {"d1": 0.5, "d2": 0.5},
+        "init": 0
+      },
+      {
+        "name": "gpe",
+        "num_units": 50,
+        "base_firing": 1,
+        "cell_types": {},
+        "init": 1
+      },
+      {
+        "name": "stn",
+        "num_units": 50,
+        "base_firing": 1,
+        "cell_types": {},
+        "init": 0
+      },
+      {
+        "name": "snr",
+        "num_units": 50,
+        "base_firing": 1,
+        "cell_types": {},
+        "init": 1
+      },
+      {
+        "name": "thal",
+        "num_units": 50,
+        "base_firing": 1,
+        "cell_types": {},
+        "init": 0
+      },
+      {
+        "name": "alm",
+        "num_units": 50,
+        "base_firing": 0,
+        "cell_types": {"exc": 0.7, "inhib": 0.3},
+        "init": 0 
+      }
+    ],
+
+    "__comment_connections": [
+        "Structure of connections key:",
+        "[",
+        "src_region: str",
+        "dst_region: str",
+        "src_region_cell_type: str",
+        "dst_region_cell_type: str",
+        "sign: str (exc or inhib)",
+        "sparsity: float (between 0 and 1)",
+        "]"
+    ],
+
+    "recurrent_connections": [
+      {
+        "src_region": "striatum",
+        "dst_region": "striatum",
+        "src_region_cell_type": null,
+        "dst_region_cell_type": null,
+        "sign": "inhib",
+        "sparsity": 0.7
+      },
+      {
+        "src_region": "striatum",
+        "dst_region": "gpe",
+        "src_region_cell_type": "d2",
+        "dst_region_cell_type": null,
+        "sign": "inhib"
+      },
+      {
+        "src_region": "striatum",
+        "dst_region": "snr",
+        "src_region_cell_type": "d1",
+        "dst_region_cell_type": null,
+        "sign": "inhib"
+      },
+      {
+        "src_region": "gpe",
+        "dst_region": "stn",
+        "src_region_cell_type": null,
+        "dst_region_cell_type": null,
+        "sign": "inhib"
+      },
+      {
+        "src_region": "stn",
+        "dst_region": "snr",
+        "src_region_cell_type": null,
+        "dst_region_cell_type": null,
+        "sign": "exc"
+      },
+      {
+        "src_region": "snr",
+        "dst_region": "thal",
+        "src_region_cell_type": null,
+        "dst_region_cell_type": null,
+        "sign": "inhib"
+      },
+      {
+        "src_region": "thal",
+        "dst_region": "striatum",
+        "src_region_cell_type": null,
+        "dst_region_cell_type": null,
+        "sign": "exc"
+      },
+      {
+        "src_region": "thal",
+        "dst_region": "alm",
+        "src_region_cell_type": null,
+        "dst_region_cell_type": null,
+        "sign": "exc"
+      },
+      {
+        "src_region": "alm",
+        "dst_region": "alm",
+        "src_region_cell_type": "exc",
+        "dst_region_cell_type": null,
+        "sign": "exc"
+      },
+      {
+        "src_region": "alm",
+        "dst_region": "alm",
+        "src_region_cell_type": "inhib",
+        "dst_region_cell_type": null,
+        "sign": "inhib"
+      },
+      {
+        "src_region": "alm",
+        "dst_region": "striatum",
+        "src_region_cell_type": "exc",
+        "dst_region_cell_type": null,
+        "sign": "exc"
+      }
+    ],
+
+    "__comment_inputs": [
+        "Structure of inputs key:",
+        "[",
+        "input_dim: int",
+        "input_name: str",
+        "input_region: str",
+        "cell_type: str",
+        "sparsity: str",
+        "sign: str",
+        "]"
+    ],
+
+    "input_regions": [
+      {
+        "num_units": 1,
+        "name": "iti"
+      }
+    ],
+
+    "input_connections": [
+      {
+        "input": "iti",
+        "dst_region": "striatum",
+        "dst_region_cell_type": null,
+        "sign": "exc",
+        "sparsity": 0.5
+      }
+    ]
+  }
