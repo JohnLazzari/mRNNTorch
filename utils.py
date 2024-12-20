@@ -19,14 +19,20 @@ def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, st
         batch_size:                 Number of conditions to be included in the sequence
     """
 
-    # Select mask based on region being silenced
-    mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
-    for region, cell_type in regions_cell_types:
-        if cell_type is not None:
-            cur_mask = stim_strength * (mrnn.region_mask_dict[region][cell_type])
-        else:
+    if region_cell_type_list is not None:
+        # Select mask based on region being silenced
+        mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
+        for region, cell_type in region_cell_type_list:
+            if cell_type is not None:
+                cur_mask = stim_strength * (mrnn.region_mask_dict[region][cell_type])
+            else:
+                cur_mask = stim_strength * (mrnn.region_mask_dict[region]["full"])
+            mask = mask + cur_mask
+    else:
+        mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
+        for region in region_list:
             cur_mask = stim_strength * (mrnn.region_mask_dict[region]["full"])
-        mask = mask + cur_mask
+            mask = mask + cur_mask
     
     # Inhibitory/excitatory stimulus to network, designed as an input current
     # It applies the inhibitory stimulus to all of the conditions specified in data (or max_seq_len) equally
@@ -36,41 +42,6 @@ def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, st
     inhib_stim = torch.cat([inhib_stim_pre, inhib_stim_silence, inhib_stim_post], dim=1)
     
     return inhib_stim
-
-def get_region_indices(mrnn, region, cell_type=None):
-    """
-    Gets the start and end indices for a specific region in the hidden state vector.
-
-    Args:
-        region (str): Name of the region
-
-    Returns:
-        tuple: (start_idx, end_idx)
-    """
-    
-    # Get the region indices
-    start_idx = 0
-    end_idx = 0
-    for cur_reg in mrnn.region_dict:
-        region_units = mrnn.region_dict[cur_reg].num_units
-        if cur_reg == region:
-            end_idx = start_idx + region_units
-            break
-        start_idx += region_units
-    
-    # If cell type is specified, get the cell type indices
-    if cell_type is not None:
-        for cell in mrnn.region_dict[region].cell_type_info:
-            # Gather necessary information to gather number of units for cell type
-            region_units = mrnn.region_dict[region].num_units
-            cell_percentage = mrnn.region_dict[region].cell_type_info[cell]
-            cell_units = int(round(region_units * cell_percentage))
-            if cell == cell_type:
-                end_idx = start_idx + cell_units
-                break
-            start_idx += cell_units
-        
-    return start_idx, end_idx
 
 def get_region_activity(mrnn, start_region, act, end_region=None, start_cell_type=None, end_cell_type=None):
     """
@@ -110,3 +81,22 @@ def get_weight_subset(mrnn, start_region=None, end_region=None, start_region_cel
     weight_subset = weight_subset.detach().cpu().numpy()
     
     return weight_subset
+
+def linearize_trajectory(mrnn, x, start_region, end_region):
+    
+    weight_subset = mrnn.get_weight_subset(start_region, end_region)
+
+    # linearize the dynamics about state
+    x_sub = mrnn.get_region_activity(start_region=start_region, end_region=end_region, act=x) 
+
+    # Manually computing jacobians
+    # Shouldn't be that hard
+    if mrnn.activation_name == "relu": 
+        x_act = F.relu(x_sub)
+        d_x_act = torch.where(x_act > 0, 1., 0.)
+        d_x_act_diag = torch.diag(d_x_act)
+        jacobian = d_x_act_diag @ weight_subset.T
+    elif mrnn.activation_name == "linear":
+        jacobian = weight_subset.T
+    
+    return jacobian

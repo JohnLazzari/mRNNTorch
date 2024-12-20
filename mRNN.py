@@ -204,6 +204,41 @@ class mRNN(nn.Module):
             torch.Tensor: Constrained weight matrix
         """
         return W_rec_mask * F.relu(W_rec) * W_rec_sign_matrix
+
+    def get_region_indices(self, region, cell_type=None):
+        """
+        Gets the start and end indices for a specific region in the hidden state vector.
+
+        Args:
+            region (str): Name of the region
+
+        Returns:
+            tuple: (start_idx, end_idx)
+        """
+        
+        # Get the region indices
+        start_idx = 0
+        end_idx = 0
+        for cur_reg in self.region_dict:
+            region_units = self.region_dict[cur_reg].num_units
+            if cur_reg == region:
+                end_idx = start_idx + region_units
+                break
+            start_idx += region_units
+        
+        # If cell type is specified, get the cell type indices
+        if cell_type is not None:
+            for cell in self.region_dict[region].cell_type_info:
+                # Gather necessary information to gather number of units for cell type
+                region_units = self.region_dict[region].num_units
+                cell_percentage = self.region_dict[region].cell_type_info[cell]
+                cell_units = int(round(region_units * cell_percentage))
+                if cell == cell_type:
+                    end_idx = start_idx + cell_units
+                    break
+                start_idx += cell_units
+            
+        return start_idx, end_idx
     
     def get_initial_condition(self, xn):
         # Initialize x and h

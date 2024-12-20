@@ -7,8 +7,9 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import json
-from mRNNTorch.utils import gen_grid, gen_inverse_grid
 from sklearn.decomposition import PCA
+from mRNNTorch.utils import get_region_activity, linearize_trajectory
+from tqdm import tqdm
 
 def linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None, start_cell_type=None, end_cell_type=None):
     """Linearize the network and compute eigenvalues at each timestep
@@ -26,22 +27,8 @@ def linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None, s
         list: Imaginary eigenvalues
         np.array: eigenvectors
     """
-    
-    weight_subset = mrnn.get_weight_subset(start_region, end_region)
 
-    # linearize the dynamics about state
-    x_sub = mrnn.get_region_activity(start_region=start_region, end_region=end_region, act=x) 
-
-    # Manually computing jacobians
-    # Shouldn't be that hard
-    if mrnn.activation_name == "relu": 
-        x_act = F.relu(x_sub)
-        d_x_act = torch.where(x_act > 0, 1., 0.)
-        d_x_act_diag = torch.diag(d_x_act)
-        jacobian = d_x_act_diag @ weight_subset.T
-    elif mrnn.activation_name == "linear":
-        jacobian = weight_subset.T
-
+    jacobian = linearize_trajectory(mrnn, x, start_region, end_region)
     eigenvalues, eigenvectors = np.linalg.eig(jacobian)
     
     # Split real and imaginary parts
@@ -55,7 +42,7 @@ def linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None, s
 
     return reals, ims, eigenvectors
 
-def psth(rnn, act):
+def psth(mrnn, act):
     """Gather the PSTH for each region in the network
 
     Args:
@@ -67,13 +54,13 @@ def psth(rnn, act):
     """
         
     activity_dict = []
-    for region in rnn.region_dict:
-        if len(rnn.region_dict[region].cell_type_info) > 0:
-            for cell_type in rnn.region_dict[region].cell_type_info:
-                mean_act = np.mean(rnn.get_region_activity(region, act, start_cell_type=cell_type), axis=-1)
+    for region in mrnn.region_dict:
+        if len(mrnn.region_dict[region].cell_type_info) > 0:
+            for cell_type in mrnn.region_dict[region].cell_type_info:
+                mean_act = np.mean(get_region_activity(mrnn, region, act, start_cell_type=cell_type), axis=-1)
                 activity_dict.append(mean_act)
         else:
-            mean_act = np.mean(rnn.get_region_activity(region, act), axis=-1)
+            mean_act = np.mean(get_region_activity(mrnn, region, act), axis=-1)
             activity_dict.append(mean_act)
     
     return activity_dict
@@ -93,7 +80,7 @@ def flow_field(
     end_region=None,
     start_region_cell_type=None,
     end_region_cell_type=None,
-    
+    linearize=False
 ):
     """ Generate flow fields and energy landscapes of mRNN activity
         Allows for specifying certain subregions to obtain velocities for
@@ -144,7 +131,7 @@ def flow_field(
         _, orig_h = mrnn(xn_temp, inp[:, :timesteps, :], noise=False)
 
     # Reshape before PCA
-    temp_act = mrnn.get_region_activity(start_region, orig_h, end_region=end_region)
+    temp_act = get_region_activity(mrnn, start_region, orig_h, end_region=end_region)
     temp_act = torch.reshape(temp_act, shape=(temp_act.shape[0] * temp_act.shape[1], temp_act.shape[2])) 
     temp_act = temp_act.detach().cpu().numpy()
 
@@ -171,14 +158,14 @@ def flow_field(
             x_0_flow.append(grid)
             start_reached = True
         if start_reached == False:
-            x_0_flow.append(mrnn.get_region_activity(region, full_act_batch))
+            x_0_flow.append(get_region_activity(mrnn, region, full_act_batch))
         if start_reached and end_reached:
-            x_0_flow.append(mrnn.get_region_activity(region, full_act_batch))
+            x_0_flow.append(get_region_activity(mrnn, region, full_act_batch))
         if region == end_region:
             end_reached = True
     x_0_flow = torch.cat(x_0_flow, dim=-1)
             
-    for t in range(0, x_0_flow.shape[1], time_skips):
+    for t in tqdm(range(0, x_0_flow.shape[1], time_skips)):
         with torch.no_grad():
             # Current timestep input
             cur_iti_inp = inp[:, t:t+1, :]
@@ -186,7 +173,7 @@ def flow_field(
             # Since we are changing the initial condition at each timestep, we need to iterate through each timestep here
             _, h = mrnn(x_0_flow[:, t, :], cur_iti_inp, noise=False)
             # Get activity for regions of interest
-            cur_region_h = mrnn.get_region_activity(start_region, h, end_region=end_region)
+            cur_region_h = get_region_activity(mrnn, start_region, h, end_region=end_region)
             next_acts[t] = cur_region_h.squeeze().detach().cpu().numpy()
         
     # Reshape data back to grid
@@ -212,3 +199,6 @@ def flow_field(
         speeds.append(c)
     
     return data_coords, x_vels, y_vels, speeds
+
+def communication_subspace(src_region, trg_region):
+    pass
