@@ -44,6 +44,10 @@ class mRNN(nn.Module):
         constrained=True, 
         t_const=0.1,
         batch_first=True,
+        lower_bound_rec=0,
+        upper_bound_rec=10,
+        lower_bound_inp=0,
+        upper_bound_inp=10,
         device="cuda",
     ):
         super(mRNN, self).__init__()
@@ -59,6 +63,10 @@ class mRNN(nn.Module):
         self.sigma_recur = noise_level_act
         self.sigma_input = noise_level_inp
         self.activation_name = activation
+        self.lower_bound_rec = lower_bound_rec
+        self.upper_bound_rec = upper_bound_rec
+        self.lower_bound_inp = lower_bound_inp
+        self.upper_bound_inp = upper_bound_inp
         
         if activation == "relu":
             self.activation = nn.ReLU()
@@ -195,7 +203,7 @@ class mRNN(nn.Module):
 
         return W_rec, W_rec_mask, W_rec_sign
 
-    def apply_dales_law(self, W_rec, W_rec_mask, W_rec_sign_matrix):
+    def apply_dales_law(self, W_rec, W_rec_mask, W_rec_sign_matrix, lower_bound=0, upper_bound=10):
         """
         Applies Dale's Law constraints to the recurrent weight matrix.
         Dale's Law states that a neuron can be either excitatory or inhibitory, but not both.
@@ -203,7 +211,9 @@ class mRNN(nn.Module):
         Returns:
             torch.Tensor: Constrained weight matrix
         """
-        return W_rec_mask * F.relu(W_rec) * W_rec_sign_matrix
+        if lower_bound < 0:
+            raise ValueError("Lower bounds below zero not allowed for Dale's Law")
+        return W_rec_mask * F.hardtanh(W_rec, lower_bound, upper_bound) * W_rec_sign_matrix
 
     def get_region_indices(self, region, cell_type=None):
         """
@@ -265,10 +275,24 @@ class mRNN(nn.Module):
 
         # Apply Dale's Law if constrained
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
-        W_rec = self.apply_dales_law(W_rec, W_rec_mask, W_rec_sign_matrix) if self.constrained else self.W_rec
+        if self.constrained:
+            W_rec = self.apply_dales_law(
+                W_rec, 
+                W_rec_mask, 
+                W_rec_sign_matrix, 
+                lower_bound=self.lower_bound_rec, 
+                upper_bound=self.upper_bound_rec
+            )
 
         W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
-        W_inp = self.apply_dales_law(W_inp, W_inp_mask, W_inp_sign_matrix) if self.constrained else self.W_inp
+        if self.constrained:
+            W_inp = self.apply_dales_law(
+                W_inp, 
+                W_inp_mask, 
+                W_inp_sign_matrix,
+                lower_bound=self.lower_bound_inp, 
+                upper_bound=self.upper_bound_inp
+            )
 
         xn_next = xn
         hn_next = self.activation(xn)
@@ -299,13 +323,13 @@ class mRNN(nn.Module):
 
             # Calculate noise terms
             if noise:
-                perturb_hid = np.sqrt(2 * self.t_const * self.sigma_recur**2) * np.random.normal(0, 1)
-                perturb_inp = np.sqrt(2 * self.t_const * self.sigma_input**2) * np.random.normal(0, 1)
+                perturb_hid = np.sqrt(2 * self.t_const * self.sigma_recur**2) * torch.randn(size=(self.total_num_units,), device=self.device)
+                perturb_inp = np.sqrt(2 * self.t_const * self.sigma_input**2) * torch.randn(size=(self.total_num_inputs,), device=self.device)
             else:
                 perturb_hid = perturb_inp = 0
             
             # Apply input noise
-            inp = inp + perturb_inp
+            inp = F.relu(inp + perturb_inp)
 
             # Update hidden state
             xn_next = (xn_next 
