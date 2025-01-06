@@ -161,7 +161,7 @@ def flow_field(
     # Repeat over the sequence length dimension to match activity
     grid = grid.unsqueeze(1).repeat(1, trajectory.shape[1], 1)
     # Repeat along the batch dimension to match the grid
-    full_act_batch = trajectory.repeat(grid.shape[0], 1, 1)
+    full_act_batch = trajectory.repeat(grid.shape[0], 1, 1).cuda()
 
     # Gather batches of grids with trial activity at each timestep
     start_reached = False
