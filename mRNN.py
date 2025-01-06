@@ -52,6 +52,8 @@ class mRNN(nn.Module):
     ):
         super(mRNN, self).__init__()
 
+        # TODO allow initialization through spectral radius
+
         # Initialize network parameters
         self.region_dict = {}
         self.inp_dict = {}
@@ -127,15 +129,13 @@ class mRNN(nn.Module):
                 sign=inp["sign"],
                 sparsity=inp["sparsity"],
             )
-
-        # Fill rest of recurrent connections with zeros
-        for region in self.region_dict:
-            self.__get_full_connectivity(self.region_dict[region])
-
-        # Fill rest of input connections with zeros
-        for inp in self.inp_dict:
-            self.__get_full_connectivity(self.inp_dict[inp])
         
+        # This completes the connections matrix between regions 
+        # By adding zeros where explicity connections are not specified.
+        # Does so for both recurrent and input connections
+        self.finalize_connectivity()
+        
+        # General network parameters
         self.total_num_units = self.__get_total_num_units(self.region_dict)
         self.total_num_inputs = self.__get_total_num_units(self.inp_dict)
         self.baseline_inp = self.__get_tonic_inp()
@@ -162,6 +162,15 @@ class mRNN(nn.Module):
             for cell_type in self.region_dict[region].cell_type_info:
                 # Generate a mask for the cell type in region_mask_dict
                 self.region_mask_dict[region][cell_type] = self.__gen_region_mask(region, cell_type=cell_type)
+    
+    def finalize_connectivity(self):
+        # Fill rest of recurrent connections with zeros
+        for region in self.region_dict:
+            self.__get_full_connectivity(self.region_dict[region])
+
+        # Fill rest of input connections with zeros
+        for inp in self.inp_dict:
+            self.__get_full_connectivity(self.inp_dict[inp])
 
     def gen_w(self, dict_):
         """
@@ -215,63 +224,20 @@ class mRNN(nn.Module):
             raise ValueError("Lower bounds below zero not allowed for Dale's Law")
         return W_rec_mask * F.hardtanh(W_rec, lower_bound, upper_bound) * W_rec_sign_matrix
 
-    def get_region_indices(self, region, cell_type=None):
-        """
-        Gets the start and end indices for a specific region in the hidden state vector.
-
-        Args:
-            region (str): Name of the region
-
-        Returns:
-            tuple: (start_idx, end_idx)
-        """
-        
-        # Get the region indices
-        start_idx = 0
-        end_idx = 0
-        for cur_reg in self.region_dict:
-            region_units = self.region_dict[cur_reg].num_units
-            if cur_reg == region:
-                end_idx = start_idx + region_units
-                break
-            start_idx += region_units
-        
-        # If cell type is specified, get the cell type indices
-        if cell_type is not None:
-            for cell in self.region_dict[region].cell_type_info:
-                # Gather necessary information to gather number of units for cell type
-                region_units = self.region_dict[region].num_units
-                cell_percentage = self.region_dict[region].cell_type_info[cell]
-                cell_units = int(round(region_units * cell_percentage))
-                if cell == cell_type:
-                    end_idx = start_idx + cell_units
-                    break
-                start_idx += cell_units
-            
-        return start_idx, end_idx
-    
-    def get_initial_condition(self, xn):
-        # Initialize x and h
-        for region in self.region_dict:
-            start_idx, end_idx = self.get_region_indices(region)
-            xn[..., start_idx:end_idx] = self.region_dict[region].init
-        xn = xn
-        return xn
-
-    def forward(self, xn, *args, noise=True):
+    def forward(self, xn, input, *args, noise=True):
         """
         Forward pass through the network.
 
         Args:
             xn (torch.Tensor): Pre-activation hidden state
+            input: Weighted input into the network (must be same shape as specified in config)
+            args: Additional unweighted network input
             noise (bool): Whether to apply noise. Defaults to True
-            args: Inputs to the network, must be same amount as specified in config
 
         Returns:
             torch.Tensor: Network output sequence
         """
-        
-        num_weighted_inputs = len(self.inp_dict.keys())
+        assert len(self.region_dict) > 0
 
         # Apply Dale's Law if constrained
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
@@ -284,6 +250,7 @@ class mRNN(nn.Module):
                 upper_bound=self.upper_bound_rec
             )
 
+        # Apply to input weights as well
         W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
         if self.constrained:
             W_inp = self.apply_dales_law(
@@ -301,35 +268,28 @@ class mRNN(nn.Module):
         new_hs = []
         new_xs = []
 
-        # Combine the first n inputs, where n is the number of input regions in config
-        # Any remaining args will be added to network without weights
-        inp_list = []
-        for idx in range(num_weighted_inputs):
-            inp_list.append(args[idx])
-        inp = torch.cat(inp_list, dim=-1)
-
-        #plt.imshow(W_rec.detach().cpu().numpy())
-        #plt.colorbar()
-        #plt.show()
-
         # Specify sequence length defined by input
         if self.batch_first:
-            seq_len = inp.shape[1]
+            seq_len = input.shape[1]
         else:
-            seq_len = inp.shape[0]
+            seq_len = input.shape[0]
         
         # Process sequence
         for t in range(seq_len):
 
             # Calculate noise terms
             if noise:
-                perturb_hid = np.sqrt(2 * self.t_const * self.sigma_recur**2) * torch.randn(size=(self.total_num_units,), device=self.device)
-                perturb_inp = np.sqrt(2 * self.t_const * self.sigma_input**2) * torch.randn(size=(self.total_num_inputs,), device=self.device)
+                # Calculate noise constants
+                const_hid = np.sqrt(2 * self.t_const * self.sigma_recur**2)
+                const_inp = np.sqrt(2 * self.t_const * self.sigma_input**2)
+                # Sample from normal distribution and scale by constant term
+                # Separate noise levels will be applied to each neuron/input
+                perturb_hid = const_hid * torch.randn(size=(self.total_num_units,), device=self.device)
+                perturb_inp = const_inp * torch.randn(size=(self.total_num_inputs,), device=self.device)
+                # Apply input noise
+                input = input + perturb_inp
             else:
                 perturb_hid = perturb_inp = 0
-            
-            # Apply input noise
-            inp = F.relu(inp + perturb_inp)
 
             # Update hidden state
             xn_next = (xn_next 
@@ -343,25 +303,31 @@ class mRNN(nn.Module):
 
             # Add input to the network
             if self.batch_first:
-                xn_next = xn_next + self.t_const * (W_inp @ inp[:, t, :].T).T
+                xn_next = xn_next + self.t_const * (W_inp @ input[:, t, :].T).T
                 # Add any remaining inputs without weights
                 # Example of when this would be useful is for optogenetic manipulations
-                for idx in range(num_weighted_inputs, len(args)):
+                for idx in range(len(args)):
                     xn_next = xn_next + self.t_const * args[idx][:, t, :]
             else:
                 # Same as above but for different shaped input
-                xn_next = xn_next + self.t_const * (W_inp @ inp[t, :, :].T).T
-                for idx in range(num_weighted_inputs, len(args)):
+                xn_next = xn_next + self.t_const * (W_inp @ input[t, :, :].T).T
+                for idx in range(len(args)):
                     xn_next = xn_next + self.t_const * args[idx][t, :, :]
 
+            # Compute activation
+            # Gather activation and pre-activation into lists
             hn_next = self.activation(xn_next)
-
             new_xs.append(xn_next)
             new_hs.append(hn_next)
         
         return torch.stack(new_xs, dim=1), torch.stack(new_hs, dim=1)
     
     def __create_def_values(self, config):
+        """Generate default values for configuration
+
+        Args:
+            config (json): Network configuration file
+        """
         
         # Set default values for recurrent region connections
         for i, region in enumerate(config["recurrent_regions"]):

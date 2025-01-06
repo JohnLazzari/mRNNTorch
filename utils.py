@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.decomposition import PCA
 import torch
+import torch.nn.functional as F
 
 def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, stim_strength, batch_size, region_list=None, region_cell_type_list=None):
 
@@ -55,10 +56,10 @@ def get_region_activity(mrnn, start_region, act, end_region=None, start_cell_typ
         region_hn: tensor containing hidden activity only for specified region
     """
     # Get start and end positions of region
-    start_idx, end_idx = mrnn.get_region_indices(start_region, cell_type=start_cell_type)
+    start_idx, end_idx = get_region_indices(mrnn, start_region, cell_type=start_cell_type)
     # If end region is specified, make new end_idx
     if end_region is not None:
-        _, end_idx = mrnn.get_region_indices(end_region, cell_type=end_cell_type)
+        _, end_idx = get_region_indices(mrnn, end_region, cell_type=end_cell_type)
     # Gather specified regional activity
     region_act = act[..., start_idx:end_idx]
     return region_act
@@ -72,9 +73,9 @@ def get_weight_subset(mrnn, start_region=None, end_region=None, start_region_cel
     mrnn_weight = mrnn.apply_dales_law(W_rec, W_rec_mask, W_rec_sign)
 
     if start_region is not None:
-        start_idx, _ = mrnn.get_region_indices(start_region, cell_type=start_region_cell_type)
+        start_idx, _ = get_region_indices(mrnn, start_region, cell_type=start_region_cell_type)
     if end_region is not None:
-        _, end_idx = mrnn.get_region_indices(end_region, cell_type=end_region_cell_type)
+        _, end_idx = get_region_indices(mrnn, end_region, cell_type=end_region_cell_type)
 
     weight_subset = mrnn_weight[start_idx:end_idx, 
                                 start_idx:end_idx]
@@ -84,10 +85,10 @@ def get_weight_subset(mrnn, start_region=None, end_region=None, start_region_cel
 
 def linearize_trajectory(mrnn, x, start_region, end_region):
     
-    weight_subset = mrnn.get_weight_subset(start_region, end_region)
+    weight_subset = get_weight_subset(mrnn, start_region, end_region)
 
     # linearize the dynamics about state
-    x_sub = mrnn.get_region_activity(start_region=start_region, end_region=end_region, act=x) 
+    x_sub = get_region_activity(mrnn, start_region=start_region, end_region=end_region, act=x) 
 
     # Manually computing jacobians
     # Shouldn't be that hard
@@ -100,3 +101,45 @@ def linearize_trajectory(mrnn, x, start_region, end_region):
         jacobian = weight_subset.T
     
     return jacobian
+
+def get_region_indices(mrnn, region, cell_type=None):
+    """
+    Gets the start and end indices for a specific region in the hidden state vector.
+
+    Args:
+        region (str): Name of the region
+
+    Returns:
+        tuple: (start_idx, end_idx)
+    """
+    
+    # Get the region indices
+    start_idx = 0
+    end_idx = 0
+    for cur_reg in mrnn.region_dict:
+        region_units = mrnn.region_dict[cur_reg].num_units
+        if cur_reg == region:
+            end_idx = start_idx + region_units
+            break
+        start_idx += region_units
+    
+    # If cell type is specified, get the cell type indices
+    if cell_type is not None:
+        for cell in mrnn.region_dict[region].cell_type_info:
+            # Gather necessary information to gather number of units for cell type
+            region_units = mrnn.region_dict[region].num_units
+            cell_percentage = mrnn.region_dict[region].cell_type_info[cell]
+            cell_units = int(round(region_units * cell_percentage))
+            if cell == cell_type:
+                end_idx = start_idx + cell_units
+                break
+            start_idx += cell_units
+        
+    return start_idx, end_idx
+
+def get_initial_condition(mrnn, xn):
+    # Initialize x and h
+    for region in mrnn.region_dict:
+        start_idx, end_idx = get_region_indices(mrnn, region)
+        xn[..., start_idx:end_idx] = mrnn.region_dict[region].init
+    return xn
