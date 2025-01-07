@@ -37,7 +37,7 @@ class mRNN(nn.Module):
 
     def __init__(
         self, 
-        config,
+        config=None,
         activation="relu",
         noise_level_act=0.01, 
         noise_level_inp=0.01, 
@@ -51,8 +51,6 @@ class mRNN(nn.Module):
         device="cuda",
     ):
         super(mRNN, self).__init__()
-
-        # TODO allow initialization through spectral radius
 
         # Initialize network parameters
         self.region_dict = {}
@@ -70,6 +68,8 @@ class mRNN(nn.Module):
         self.lower_bound_inp = lower_bound_inp
         self.upper_bound_inp = upper_bound_inp
         
+        # Specify activation function
+        # Only common activations are implemented
         if activation == "relu":
             self.activation = nn.ReLU()
         elif activation == "tanh":
@@ -80,79 +80,90 @@ class mRNN(nn.Module):
             self.activation == linear()
         else:
             raise Exception("Only relu, tanh, sigmoid, or linear activations are implemented")
-
-        # Load and process configuration
-        with open(config, 'r') as f:
-            config = json.load(f)
         
-        # Generate network structure
-        self.__create_def_values(config)
+        # Allow configuration file to be optional
+        # If configuration is given, network will be automatically generated using it
+        # Otherwise, user will manually build a network in their own class
+        if config is not None:
 
-        # Generate recurrent regions
-        for region in config["recurrent_regions"]:
-            self.region_dict[region["name"]] = Region(
-                num_units=region["num_units"],
-                base_firing=region["base_firing"],
-                init=region["init"],
-                device=self.device,
-                cell_types=region["cell_types"]
-            )
+            # Load and process configuration
+            with open(config, 'r') as f:
+                config = json.load(f)
+            
+            # Only the recurrent regions need to be specified
+            assert "recurrent_regions" in config
+            assert "recurrent_connections" in config
+            
+            # Generate network structure
+            self.__create_def_values(config)
 
-        # Generate recurrent connections
-        for connection in config["recurrent_connections"]:
-            self.region_dict[connection["src_region"]].add_connection(
-                dst_region_name=connection["dst_region"],
-                dst_region=self.region_dict[connection["dst_region"]],
-                src_region_cell_type=connection["src_region_cell_type"],
-                dst_region_cell_type=connection["dst_region_cell_type"],
-                sign=connection["sign"],
-                sparsity=connection["sparsity"],
-            )
+            # Generate recurrent regions
+            for region in config["recurrent_regions"]:
+                self.add_recurrent_region(
+                    name=region["name"],
+                    num_units=region["num_units"],
+                    base_firing=region["base_firing"],
+                    init=region["init"],
+                    device=self.device,
+                    cell_types=region["cell_types"],
+                    region_type="recurrent"
+                )
 
-        # Generate input regions
-        for inp in config["input_regions"]:
-            self.inp_dict[inp["name"]] = Region(
-                num_units=inp["num_units"],
-                base_firing=0,
-                init=0,
-                device=self.device,
-                cell_types={}
-            )
-        
-        # Generate input connections
-        for inp in config["input_connections"]:
-            self.inp_dict[inp["input"]].add_connection(
-                dst_region_name=inp["dst_region"],
-                dst_region=self.region_dict[inp["dst_region"]],
-                src_region_cell_type=None,
-                dst_region_cell_type=inp["dst_region_cell_type"],
-                sign=inp["sign"],
-                sparsity=inp["sparsity"],
-            )
-        
-        # This completes the connections matrix between regions 
-        # By adding zeros where explicity connections are not specified.
-        # Does so for both recurrent and input connections
-        self.finalize_connectivity()
-        
+            # Generate recurrent connections
+            for connection in config["recurrent_connections"]:
+                self.add_recurrent_connection(
+                    src_region=connection["src_region"],
+                    dst_region=connection["dst_region"],
+                    src_region_cell_type=connection["src_region_cell_type"],
+                    dst_region_cell_type=connection["dst_region_cell_type"],
+                    sign=connection["sign"],
+                    sparsity=connection["sparsity"],
+                    region_type="recurrent"
+                )
+
+            # Generate input regions
+            for region in config["input_regions"]:
+                self.add_input_region(
+                    name=region["name"],
+                    num_units=region["num_units"],
+                    base_firing=0,
+                    init=0,
+                    device=self.device,
+                    cell_types={},
+                    region_type="input"
+                )
+            
+            # Generate input connections
+            for connection in config["input_connections"]:
+                self.add_input_connection(
+                    src_region=connection["src_region"],
+                    dst_region=connection["dst_region"],
+                    dst_region_cell_type=connection["dst_region_cell_type"],
+                    sign=connection["sign"],
+                    sparsity=connection["sparsity"],
+                    region_type="input"
+                )
+                
+            # This completes the connections matrix between regions 
+            # By adding zeros where explicity connections are not specified.
+            # Does so for both recurrent and input connections
+            self.finalize_connectivity()
+    
+    def add_recurrent_region(self, name, num_units, base_firing=0, init=0, device="cuda", cell_types={}):
+        """_summary_
+
+        Args:
+            name (_type_): _description_
+            num_units (_type_): _description_
+            base_firing (int, optional): _description_. Defaults to 0.
+            init (int, optional): _description_. Defaults to 0.
+            device (str, optional): _description_. Defaults to "cuda".
+            cell_types (dict, optional): _description_. Defaults to {}.
+        """
+        self.__add_region(self.region_dict, name, num_units, base_firing, init, device, cell_types)
         # General network parameters
         self.total_num_units = self.__get_total_num_units(self.region_dict)
-        self.total_num_inputs = self.__get_total_num_units(self.inp_dict)
         self.baseline_inp = self.__get_tonic_inp()
-
-        # Register all parameters 
-        for region in self.region_dict:
-            for name, param in self.region_dict[region].named_parameters():
-                self.register_parameter(f"{region}_{name}", param)
-                # Default initialization for recurrent weights
-                nn.init.uniform_(param, 0, np.sqrt(1 / (2*self.total_num_units)))
-
-        for inp in self.inp_dict:
-            for name, param in self.inp_dict[inp].named_parameters():
-                self.register_parameter(f"{inp}_{name}", param)
-                # Default initialization for inputs
-                nn.init.uniform_(param, 0, np.sqrt(1 / (self.total_num_units + self.total_num_inputs)))
-
         # Get indices for specific regions
         for region in self.region_dict:
             # Get the mask for the whole region, regardless of cell type
@@ -162,7 +173,69 @@ class mRNN(nn.Module):
             for cell_type in self.region_dict[region].cell_type_info:
                 # Generate a mask for the cell type in region_mask_dict
                 self.region_mask_dict[region][cell_type] = self.__gen_region_mask(region, cell_type=cell_type)
+
+    def add_input_region(self, name, num_units, device="cuda"):
+        """_summary_
+
+        Args:
+            name (_type_): _description_
+            num_units (_type_): _description_
+            base_firing (int, optional): _description_. Defaults to 0.
+            init (int, optional): _description_. Defaults to 0.
+            device (str, optional): _description_. Defaults to "cuda".
+            cell_types (dict, optional): _description_. Defaults to {}.
+        """
+        self.__add_region(self.inp_dict, name, num_units, base_firing=0, init=0, device=device, cell_types={})
+        self.total_num_inputs = self.__get_total_num_units(self.inp_dict)
     
+    def add_recurrent_connection(self, src_region, dst_region, src_region_cell_type=None, dst_region_cell_type=None, sign="exc", sparsity=None):
+        """_summary_
+
+        Args:
+            src_region (_type_): _description_
+            dst_region (_type_): _description_
+            src_region_cell_type (_type_, optional): _description_. Defaults to None.
+            dst_region_cell_type (_type_, optional): _description_. Defaults to None.
+            sign (str, optional): _description_. Defaults to "exc".
+            sparsity (_type_, optional): _description_. Defaults to None.
+        """
+        self.__add_connection(self.region_dict, src_region, dst_region, src_region_cell_type, dst_region_cell_type, sign, sparsity)
+        # Register all parameters 
+        # Check that we do not register same parameters more than once
+        for region in self.region_dict:
+            for name, param in self.region_dict[region].named_parameters():
+                param_name = f"{region}_{name}"
+                if param_name not in self.state_dict():
+                    self.register_parameter(param_name, param)
+                    # Default initialization for recurrent weights
+                    if self.constrained == True:
+                        nn.init.uniform_(param, 0, np.sqrt(1 / (2*self.total_num_units)))
+                    else:
+                        nn.init.xavier_normal_(param)
+
+    def add_input_connection(self, src_region, dst_region, dst_region_cell_type=None, sign="exc", sparsity=None):
+        """_summary_
+
+        Args:
+            src_region (_type_): _description_
+            dst_region (_type_): _description_
+            dst_region_cell_type (_type_, optional): _description_. Defaults to None.
+            sign (str, optional): _description_. Defaults to "exc".
+            sparsity (_type_, optional): _description_. Defaults to None.
+        """
+        self.__add_connection(self.inp_dict, src_region, dst_region, src_region_cell_type=None, dst_region_cell_type=dst_region_cell_type, sign=sign, sparsity=sparsity)
+        # Register all parameters for inputs
+        for inp in self.inp_dict:
+            for name, param in self.inp_dict[inp].named_parameters():
+                param_name = f"{inp}_{name}"
+                if param_name not in self.state_dict():
+                    self.register_parameter(param_name, param)
+                    # Default initialization for inputs
+                    if self.constrained == True:
+                        nn.init.uniform_(param, 0, np.sqrt(1 / (self.total_num_units + self.total_num_inputs)))
+                    else:
+                        nn.init.xavier_normal_(param)
+
     def finalize_connectivity(self):
         # Fill rest of recurrent connections with zeros
         for region in self.region_dict:
@@ -224,7 +297,7 @@ class mRNN(nn.Module):
             raise ValueError("Lower bounds below zero not allowed for Dale's Law")
         return W_rec_mask * F.hardtanh(W_rec, lower_bound, upper_bound) * W_rec_sign_matrix
 
-    def forward(self, xn, input, *args, noise=True):
+    def forward(self, xn, inp, *args, noise=True):
         """
         Forward pass through the network.
 
@@ -238,6 +311,7 @@ class mRNN(nn.Module):
             torch.Tensor: Network output sequence
         """
         assert len(self.region_dict) > 0
+        assert len(self.inp_dict) > 0
 
         # Apply Dale's Law if constrained
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
@@ -270,9 +344,9 @@ class mRNN(nn.Module):
 
         # Specify sequence length defined by input
         if self.batch_first:
-            seq_len = input.shape[1]
+            seq_len = inp.shape[1]
         else:
-            seq_len = input.shape[0]
+            seq_len = inp.shape[0]
         
         # Process sequence
         for t in range(seq_len):
@@ -287,7 +361,7 @@ class mRNN(nn.Module):
                 perturb_hid = const_hid * torch.randn(size=(self.total_num_units,), device=self.device)
                 perturb_inp = const_inp * torch.randn(size=(self.total_num_inputs,), device=self.device)
                 # Apply input noise
-                input = input + perturb_inp
+                inp = inp + perturb_inp
             else:
                 perturb_hid = perturb_inp = 0
 
@@ -303,14 +377,14 @@ class mRNN(nn.Module):
 
             # Add input to the network
             if self.batch_first:
-                xn_next = xn_next + self.t_const * (W_inp @ input[:, t, :].T).T
+                xn_next = xn_next + self.t_const * (W_inp @ inp[:, t, :].T).T
                 # Add any remaining inputs without weights
                 # Example of when this would be useful is for optogenetic manipulations
                 for idx in range(len(args)):
                     xn_next = xn_next + self.t_const * args[idx][:, t, :]
             else:
                 # Same as above but for different shaped input
-                xn_next = xn_next + self.t_const * (W_inp @ input[t, :, :].T).T
+                xn_next = xn_next + self.t_const * (W_inp @ inp[t, :, :].T).T
                 for idx in range(len(args)):
                     xn_next = xn_next + self.t_const * args[idx][t, :, :]
 
@@ -321,6 +395,47 @@ class mRNN(nn.Module):
             new_hs.append(hn_next)
         
         return torch.stack(new_xs, dim=1), torch.stack(new_hs, dim=1)
+
+    def __add_region(self, dict, name, num_units, base_firing=0, init=0, device="cuda", cell_types={}):
+        """Manually add a region to the network's region_dict
+
+        Args:
+            type_region (str): Either "recurrent" or "input"
+            name (_type_): _description_
+            num_units (_type_): _description_
+            base_firing (_type_): _description_
+            init (_type_): _description_
+            device (_type_): _description_
+            cell_types (_type_): _description_
+        """
+        dict[name] = Region(
+            num_units=num_units,
+            base_firing=base_firing,
+            init=init,
+            device=device,
+            cell_types=cell_types
+        )
+
+    def __add_connection(self, dict, src_region, dst_region, src_region_cell_type=None, dst_region_cell_type=None, sign="exc", sparsity=None):
+        """Manually add a region to the network's region_dict
+
+        Args:
+            type_region (str): Either "recurrent" or "input"
+            name (_type_): _description_
+            num_units (_type_): _description_
+            base_firing (_type_): _description_
+            init (_type_): _description_
+            device (_type_): _description_
+            cell_types (_type_): _description_
+        """
+        dict[src_region].add_connection(
+            dst_region_name=dst_region,
+            dst_region=self.region_dict[dst_region],
+            src_region_cell_type=src_region_cell_type,
+            dst_region_cell_type=dst_region_cell_type,
+            sign=sign,
+            sparsity=sparsity,
+        )
     
     def __create_def_values(self, config):
         """Generate default values for configuration
@@ -339,6 +454,8 @@ class mRNN(nn.Module):
                 region["cell_types"] = {}
             if "init" not in region:
                 region["init"] = 0
+            if "base_firing" not in region:
+                region["base_firing"] = 0
 
         # Set default values for recurrent region connections
         for connection in config["recurrent_connections"]:
