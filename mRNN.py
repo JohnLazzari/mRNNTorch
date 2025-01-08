@@ -105,8 +105,6 @@ class mRNN(nn.Module):
                     base_firing=region["base_firing"],
                     init=region["init"],
                     device=self.device,
-                    cell_types=region["cell_types"],
-                    region_type="recurrent"
                 )
 
             # Generate recurrent connections
@@ -114,11 +112,8 @@ class mRNN(nn.Module):
                 self.add_recurrent_connection(
                     src_region=connection["src_region"],
                     dst_region=connection["dst_region"],
-                    src_region_cell_type=connection["src_region_cell_type"],
-                    dst_region_cell_type=connection["dst_region_cell_type"],
                     sign=connection["sign"],
-                    sparsity=connection["sparsity"],
-                    region_type="recurrent"
+                    sparsity=connection["sparsity"]
                 )
 
             # Generate input regions
@@ -126,11 +121,7 @@ class mRNN(nn.Module):
                 self.add_input_region(
                     name=region["name"],
                     num_units=region["num_units"],
-                    base_firing=0,
-                    init=0,
-                    device=self.device,
-                    cell_types={},
-                    region_type="input"
+                    device=self.device
                 )
             
             # Generate input connections
@@ -138,10 +129,8 @@ class mRNN(nn.Module):
                 self.add_input_connection(
                     src_region=connection["src_region"],
                     dst_region=connection["dst_region"],
-                    dst_region_cell_type=connection["dst_region_cell_type"],
                     sign=connection["sign"],
-                    sparsity=connection["sparsity"],
-                    region_type="input"
+                    sparsity=connection["sparsity"]
                 )
                 
             # This completes the connections matrix between regions 
@@ -149,7 +138,7 @@ class mRNN(nn.Module):
             # Does so for both recurrent and input connections
             self.finalize_connectivity()
     
-    def add_recurrent_region(self, name, num_units, base_firing=0, init=0, device="cuda", cell_types={}):
+    def add_recurrent_region(self, name, num_units, base_firing=0, init=0, device="cuda"):
         """_summary_
 
         Args:
@@ -160,7 +149,7 @@ class mRNN(nn.Module):
             device (str, optional): _description_. Defaults to "cuda".
             cell_types (dict, optional): _description_. Defaults to {}.
         """
-        self.__add_region(self.region_dict, name, num_units, base_firing, init, device, cell_types)
+        self.__add_region(self.region_dict, name, num_units, base_firing, init, device)
         # General network parameters
         self.total_num_units = self.__get_total_num_units(self.region_dict)
         self.baseline_inp = self.__get_tonic_inp()
@@ -168,11 +157,7 @@ class mRNN(nn.Module):
         for region in self.region_dict:
             # Get the mask for the whole region, regardless of cell type
             self.region_mask_dict[region] = {}
-            self.region_mask_dict[region]["full"] = self.__gen_region_mask(region)
-            # Loop through the cell type of each region if not empty
-            for cell_type in self.region_dict[region].cell_type_info:
-                # Generate a mask for the cell type in region_mask_dict
-                self.region_mask_dict[region][cell_type] = self.__gen_region_mask(region, cell_type=cell_type)
+            self.region_mask_dict[region] = self.__gen_region_mask(region)
 
     def add_input_region(self, name, num_units, device="cuda"):
         """_summary_
@@ -185,21 +170,19 @@ class mRNN(nn.Module):
             device (str, optional): _description_. Defaults to "cuda".
             cell_types (dict, optional): _description_. Defaults to {}.
         """
-        self.__add_region(self.inp_dict, name, num_units, base_firing=0, init=0, device=device, cell_types={})
+        self.__add_region(self.inp_dict, name, num_units, base_firing=0, init=0, device=device)
         self.total_num_inputs = self.__get_total_num_units(self.inp_dict)
     
-    def add_recurrent_connection(self, src_region, dst_region, src_region_cell_type=None, dst_region_cell_type=None, sign="exc", sparsity=None):
+    def add_recurrent_connection(self, src_region, dst_region, sign="exc", sparsity=None):
         """_summary_
 
         Args:
             src_region (_type_): _description_
             dst_region (_type_): _description_
-            src_region_cell_type (_type_, optional): _description_. Defaults to None.
-            dst_region_cell_type (_type_, optional): _description_. Defaults to None.
             sign (str, optional): _description_. Defaults to "exc".
             sparsity (_type_, optional): _description_. Defaults to None.
         """
-        self.__add_connection(self.region_dict, src_region, dst_region, src_region_cell_type, dst_region_cell_type, sign, sparsity)
+        self.__add_connection(self.region_dict, src_region, dst_region, sign, sparsity)
         # Register all parameters 
         # Check that we do not register same parameters more than once
         for region in self.region_dict:
@@ -213,7 +196,7 @@ class mRNN(nn.Module):
                     else:
                         nn.init.xavier_normal_(param)
 
-    def add_input_connection(self, src_region, dst_region, dst_region_cell_type=None, sign="exc", sparsity=None):
+    def add_input_connection(self, src_region, dst_region, sign="exc", sparsity=None):
         """_summary_
 
         Args:
@@ -223,7 +206,7 @@ class mRNN(nn.Module):
             sign (str, optional): _description_. Defaults to "exc".
             sparsity (_type_, optional): _description_. Defaults to None.
         """
-        self.__add_connection(self.inp_dict, src_region, dst_region, src_region_cell_type=None, dst_region_cell_type=dst_region_cell_type, sign=sign, sparsity=sparsity)
+        self.__add_connection(self.inp_dict, src_region, dst_region, sign=sign, sparsity=sparsity)
         # Register all parameters for inputs
         for inp in self.inp_dict:
             for name, param in self.inp_dict[inp].named_parameters():
@@ -396,7 +379,7 @@ class mRNN(nn.Module):
         
         return torch.stack(new_xs, dim=1), torch.stack(new_hs, dim=1)
 
-    def __add_region(self, dict, name, num_units, base_firing=0, init=0, device="cuda", cell_types={}):
+    def __add_region(self, dict, name, num_units, base_firing=0, init=0, device="cuda"):
         """Manually add a region to the network's region_dict
 
         Args:
@@ -412,11 +395,10 @@ class mRNN(nn.Module):
             num_units=num_units,
             base_firing=base_firing,
             init=init,
-            device=device,
-            cell_types=cell_types
+            device=device
         )
 
-    def __add_connection(self, dict, src_region, dst_region, src_region_cell_type=None, dst_region_cell_type=None, sign="exc", sparsity=None):
+    def __add_connection(self, dict, src_region, dst_region, sign="exc", sparsity=None):
         """Manually add a region to the network's region_dict
 
         Args:
@@ -431,8 +413,6 @@ class mRNN(nn.Module):
         dict[src_region].add_connection(
             dst_region_name=dst_region,
             dst_region=self.region_dict[dst_region],
-            src_region_cell_type=src_region_cell_type,
-            dst_region_cell_type=dst_region_cell_type,
             sign=sign,
             sparsity=sparsity,
         )
@@ -450,8 +430,6 @@ class mRNN(nn.Module):
                 region["name"] = f"region_{i}"
             if "num_units" not in region:
                 region["num_units"] = 100
-            if "cell_types" not in region:
-                region["cell_types"] = {}
             if "init" not in region:
                 region["init"] = 0
             if "base_firing" not in region:
@@ -459,10 +437,6 @@ class mRNN(nn.Module):
 
         # Set default values for recurrent region connections
         for connection in config["recurrent_connections"]:
-            if "src_region_cell_type" not in connection:
-                connection["src_region_cell_type"] = None
-            if "dst_region_cell_type" not in connection:
-                connection["dst_region_cell_type"] = None
             if "sign" not in connection:
                 connection["sign"] = "exc"
             if "sparsity" not in connection:
@@ -475,14 +449,12 @@ class mRNN(nn.Module):
 
         # Set default values for input region connections
         for connection in config["input_connections"]:
-            if "dst_region_cell_type" not in connection:
-                connection["dst_region_cell_type"] = None
             if "sign" not in connection:
                 connection["sign"] = "exc"
             if "sparsity" not in connection:
                 connection["sparsity"] = 0
 
-    def __gen_region_mask(self, region, cell_type=None):
+    def __gen_region_mask(self, region):
         """
         Generates a mask for a specific region and optionally a cell type.
 
@@ -493,14 +465,13 @@ class mRNN(nn.Module):
         Returns:
             torch.Tensor: Binary mask
         """
-        mask_type = "full" if cell_type is None else cell_type
         mask = []
         
         for next_region in self.region_dict:
             if region == next_region:
-                mask.append(self.region_dict[region].masks[mask_type])
+                mask.append(self.region_dict[region].masks["ones"])
             else:
-                mask.append(self.region_dict[next_region].masks["zero"])
+                mask.append(self.region_dict[next_region].masks["zeros"])
         
         return torch.cat(mask).to(self.device)
 
@@ -517,8 +488,6 @@ class mRNN(nn.Module):
                 region.add_connection(
                     dst_region_name=other_region,
                     dst_region=self.region_dict[other_region],
-                    src_region_cell_type=None,
-                    dst_region_cell_type=None,
                     sign=None,
                     sparsity=None,
                     zero_connection=True

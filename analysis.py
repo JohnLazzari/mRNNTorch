@@ -8,10 +8,10 @@ import math
 import matplotlib.pyplot as plt
 import json
 from sklearn.decomposition import PCA
-from mRNNTorch.utils import get_region_activity, linearize_trajectory
+from mRNNTorch.utils import get_region_activity, linearize_trajectory, get_initial_condition
 from tqdm import tqdm
 
-def linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None, start_cell_type=None, end_cell_type=None):
+def linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None):
     """Linearize the network and compute eigenvalues at each timestep
 
     Args:
@@ -55,36 +55,25 @@ def psth(mrnn, act, average=True):
         
     activity_dict = []
     for region in mrnn.region_dict:
-        if len(mrnn.region_dict[region].cell_type_info) > 0:
-            for cell_type in mrnn.region_dict[region].cell_type_info:
-                if average == True:
-                    mean_act = np.mean(get_region_activity(mrnn, region, act, start_cell_type=cell_type), axis=-1)
-                else:
-                    mean_act = get_region_activity(mrnn, region, act, start_cell_type=cell_type)
-                activity_dict.append(mean_act)
+        if average == True:
+            mean_act = np.mean(get_region_activity(mrnn, region, act), axis=-1)
         else:
-            if average == True:
-                mean_act = np.mean(get_region_activity(mrnn, region, act), axis=-1)
-            else:
-                mean_act = get_region_activity(mrnn, region, act)
-            activity_dict.append(mean_act)
+            mean_act = get_region_activity(mrnn, region, act)
+        activity_dict.append(mean_act)
     
     return activity_dict
 
 def flow_field(
     mrnn, 
     trajectory,
-    input,
+    inp,
     time_skips=1, 
     num_points=50,
     lower_bound_x=-10,
     upper_bound_x=10,
     lower_bound_y=-10,
     upper_bound_y=10,
-    start_region=None,
-    end_region=None,
-    start_region_cell_type=None,
-    end_region_cell_type=None,
+    region_list=None,
     linearize=False
 ):
     """ Generate flow fields and energy landscapes of mRNN activity
@@ -101,10 +90,7 @@ def flow_field(
         upper_bound_x (int): _description_
         lower_bound_y (int): _description_
         upper_bound_y (int): _description_
-        start_region (str): _description_
-        end_region (str): _description_
-        start_region_cell_type (str): _description_
-        end_region_cell_type (str): _description_
+        region_cell_type_list (list): 
 
     Returns:
         _type_: _description_
@@ -133,23 +119,20 @@ def flow_field(
 
     # Initialize hidden states
     xn_temp = torch.zeros(size=(batch_size, mrnn.total_num_units), device="cuda")
-    xn_temp = mrnn.get_initial_condition(xn_temp)
+    xn_temp = get_initial_condition(mrnn, xn_temp)
 
     # Gather activity for specified region and cell type
-    temp_act = get_region_activity(
-        mrnn, 
-        start_region, 
-        trajectory, 
-        end_region=end_region, 
-        start_cell_type=start_region_cell_type, 
-        end_cell_type=end_region_cell_type,
-    )
+    temp_region_acts = []
+    for region in region_list:
+        temp_act_cur = get_region_activity(mrnn, region, trajectory)
+        temp_region_acts.append(temp_act_cur)
+    temp_act = torch.cat(temp_region_acts, dim=-1)
 
     # Reshape activity before performing PCA
     temp_act = torch.reshape(temp_act, shape=(temp_act.shape[0] * temp_act.shape[1], temp_act.shape[2])) 
     temp_act = temp_act.detach().cpu().numpy()
 
-    # Do PCA on the specified region
+    # Do PCA on the specified region(s)
     x_pca.fit(temp_act)
 
     # Inverse PCA to input grid into network
@@ -164,37 +147,36 @@ def flow_field(
     full_act_batch = trajectory.repeat(grid.shape[0], 1, 1).cuda()
 
     # Gather batches of grids with trial activity at each timestep
-    start_reached = False
-    end_reached = False
+    grid_region_idx = 0
     x_0_flow = []
 
     # In order to get next step activity for grid, each region not being represented
     # By the grid will assume their values from the original trajectory passed in at 
     # Each timestep. Here we will gather activity for the grid and properly append the 
     # non-specified regions to the activity tensor to get the full activation for the network
-    
     for region in mrnn.region_dict:
-        if region == start_region:
-            x_0_flow.append(grid)
-            start_reached = True
-        if start_reached == False:
+        if region in region_list:
+            x_0_flow.append(grid[..., grid_region_idx:grid_region_idx + mrnn.region_dict[region].num_units])
+            grid_region_idx += mrnn.region_dict[region].num_units
+        else:
             x_0_flow.append(get_region_activity(mrnn, region, full_act_batch))
-        if start_reached and end_reached:
-            x_0_flow.append(get_region_activity(mrnn, region, full_act_batch))
-        if region == end_region:
-            end_reached = True
     x_0_flow = torch.cat(x_0_flow, dim=-1)
             
+    # Now going through 
     for t in tqdm(range(0, x_0_flow.shape[1], time_skips)):
         with torch.no_grad():
             # Current timestep input
-            cur_iti_inp = input[:, t:t+1, :]
+            inp_t = inp[:, t:t+1, :]
             # Get activity for current timestep
             # Since we are changing the initial condition at each timestep, we need to iterate through each timestep here
-            _, h = mrnn(x_0_flow[:, t, :], cur_iti_inp, noise=False)
-            # Get activity for regions of interest
-            cur_region_h = get_region_activity(mrnn, start_region, h, end_region=end_region)
-            next_acts[t] = cur_region_h.squeeze().detach().cpu().numpy()
+            _, h = mrnn(x_0_flow[:, t, :], inp_t, noise=False)
+        # Get activity for regions of interest
+        temp_region_acts = []
+        for region in region_list:
+            temp_act_cur = get_region_activity(mrnn, region, h)
+            temp_region_acts.append(temp_act_cur)
+        cur_region_h = torch.cat(temp_region_acts, dim=-1)
+        next_acts[t] = cur_region_h.squeeze().detach().cpu().numpy()
         
     # Reshape data back to grid
     data_coords = data_coords.numpy()

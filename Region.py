@@ -22,7 +22,7 @@ class Region(nn.Module):
         masks (dict): Masks for each cell type and region properties (e.g., full mask, zero mask).
     """
     
-    def __init__(self, num_units, base_firing, init, device, cell_types=None):
+    def __init__(self, num_units, base_firing, init, device):
         """
         Initializes the Region class.
         
@@ -38,7 +38,6 @@ class Region(nn.Module):
         self.init = init * torch.ones(size=(self.num_units,))
         self.device = device
         self.base_firing = base_firing * torch.ones(size=(num_units,))
-        self.cell_type_info = cell_types if cell_types is not None else {}
         self.connections = {}
         self.masks = {}
 
@@ -48,8 +47,6 @@ class Region(nn.Module):
         self, 
         dst_region_name, 
         dst_region, 
-        src_region_cell_type, 
-        dst_region_cell_type, 
         sign, 
         sparsity,
         zero_connection=False, 
@@ -68,6 +65,7 @@ class Region(nn.Module):
             lower_bound (float, optional):          Lower bound for uniform weight initialization.
             upper_bound (float, optional):          Upper bound for uniform weight initialization.
         """
+        assert dst_region_name not in self.connections
         connection_properties = {}
 
         # Initialize connection parameters
@@ -96,8 +94,8 @@ class Region(nn.Module):
         connection_tensor_dst = torch.ones_like(parameter, device=self.device).T if not zero_connection else torch.zeros_like(parameter, device=self.device).T
 
         # Create weight masks based on cell types, if specified
-        weight_mask_src, sign_matrix_src = self.__get_weight_and_sign_matrices(src_region_cell_type, connection_tensor_src, sparse_tensor_src)
-        weight_mask_dst, sign_matrix_dst = dst_region.__get_weight_and_sign_matrices(dst_region_cell_type, connection_tensor_dst, sparse_tensor_dst)
+        weight_mask_src, sign_matrix_src = self.__get_weight_and_sign_matrices(connection_tensor_src, sparse_tensor_src)
+        weight_mask_dst, sign_matrix_dst = dst_region.__get_weight_and_sign_matrices(connection_tensor_dst, sparse_tensor_dst)
 
         # Combine masks
         # Transpose the dst matrices since they should correspond to row operations
@@ -113,19 +111,11 @@ class Region(nn.Module):
         # Store weight mask and sign matrix
         connection_properties["weight_mask"] = weight_mask.to(self.device)
         connection_properties["sign_matrix"] = sign_matrix.to(self.device)
+        self.connections[dst_region_name] = connection_properties
 
-        # Update connections dictionary
-        if dst_region_name in self.connections:
-            # If current region already has connection with dst_region
-            # Simply update the make to account for a new connection (such as to a new cell type)
-            self.connections[dst_region_name]["weight_mask"] += connection_properties["weight_mask"]
-            self.connections[dst_region_name]["sign_matrix"] += connection_properties["sign_matrix"]
-        else:
-            self.connections[dst_region_name] = connection_properties
-
-            # Manually register parameters
-            if not zero_connection:
-                self.register_parameter(dst_region_name, self.connections[dst_region_name]["parameter"])
+        # Manually register parameters
+        if not zero_connection:
+            self.register_parameter(dst_region_name, self.connections[dst_region_name]["parameter"])
 
     def __generate_masks(self):
         """
@@ -134,33 +124,10 @@ class Region(nn.Module):
         full_mask = torch.ones(size=(self.num_units,)).to(self.device)
         zero_mask = torch.zeros(size=(self.num_units,)).to(self.device)
 
-        self.masks["full"] = full_mask
-        self.masks["zero"] = zero_mask
+        self.masks["ones"] = full_mask
+        self.masks["zeros"] = zero_mask
 
-        for key in self.cell_type_info:
-            mask = self.__generate_cell_type_mask(key)
-            self.masks[key] = mask.to(self.device)
-
-    def __generate_cell_type_mask(self, key):
-        """
-        Generates a mask for a specific cell type based on its proportion in the region.
-
-        Args:
-            key (str): The cell type identifier.
-
-        Returns:
-            torch.Tensor: Mask for the specified cell type.
-        """
-        cur_masks = []
-        for prev_key in self.cell_type_info:
-            if prev_key == key:
-                cur_masks.append(torch.ones(size=(int(round(self.num_units * self.cell_type_info[prev_key])),)))
-            else:
-                cur_masks.append(torch.zeros(size=(int(round(self.num_units * self.cell_type_info[prev_key])),)))
-        mask = torch.cat(cur_masks)
-        return mask
-
-    def __get_weight_and_sign_matrices(self, cell_type, connection_tensor, sparse_tensor):
+    def __get_weight_and_sign_matrices(self, connection_tensor, sparse_tensor):
         """
         Retrieves the weight mask and sign matrix for a specified cell type.
 
@@ -171,12 +138,8 @@ class Region(nn.Module):
         Returns:
             tuple: weight mask and sign matrix.
         """
-        if cell_type is not None:
-            weight_mask = sparse_tensor * connection_tensor * self.masks.get(cell_type)
-            sign_matrix = sparse_tensor * connection_tensor * self.masks.get(cell_type)
-        else:
-            weight_mask = sparse_tensor * connection_tensor
-            sign_matrix = sparse_tensor * connection_tensor
+        weight_mask = sparse_tensor * connection_tensor
+        sign_matrix = sparse_tensor * connection_tensor
 
         return weight_mask, sign_matrix
 

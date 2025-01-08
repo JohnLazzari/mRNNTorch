@@ -3,7 +3,7 @@ from sklearn.decomposition import PCA
 import torch
 import torch.nn.functional as F
 
-def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, stim_strength, batch_size, region_list=None, region_cell_type_list=None):
+def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, stim_strength, batch_size, region_list=None):
 
     """
     Get inhibitory or excitatory stimulus for optogenetic replication
@@ -20,20 +20,10 @@ def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, st
         batch_size:                 Number of conditions to be included in the sequence
     """
 
-    if region_cell_type_list is not None:
-        # Select mask based on region being silenced
-        mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
-        for region, cell_type in region_cell_type_list:
-            if cell_type is not None:
-                cur_mask = stim_strength * (mrnn.region_mask_dict[region][cell_type])
-            else:
-                cur_mask = stim_strength * (mrnn.region_mask_dict[region]["full"])
-            mask = mask + cur_mask
-    else:
-        mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
-        for region in region_list:
-            cur_mask = stim_strength * (mrnn.region_mask_dict[region]["full"])
-            mask = mask + cur_mask
+    mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
+    for region in region_list:
+        cur_mask = stim_strength * (mrnn.region_mask_dict[region])
+        mask = mask + cur_mask
     
     # Inhibitory/excitatory stimulus to network, designed as an input current
     # It applies the inhibitory stimulus to all of the conditions specified in data (or max_seq_len) equally
@@ -44,7 +34,7 @@ def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, st
     
     return inhib_stim
 
-def get_region_activity(mrnn, start_region, act, end_region=None, start_cell_type=None, end_cell_type=None):
+def get_region_activity(mrnn, start_region, act, end_region=None):
     """
     Takes in hn and the specified region and returns the activity hn for the corresponding region
 
@@ -56,15 +46,25 @@ def get_region_activity(mrnn, start_region, act, end_region=None, start_cell_typ
         region_hn: tensor containing hidden activity only for specified region
     """
     # Get start and end positions of region
-    start_idx, end_idx = get_region_indices(mrnn, start_region, cell_type=start_cell_type)
+    start_idx, end_idx = get_region_indices(mrnn, start_region)
     # If end region is specified, make new end_idx
     if end_region is not None:
-        _, end_idx = get_region_indices(mrnn, end_region, cell_type=end_cell_type)
+        _, end_idx = get_region_indices(mrnn, end_region)
     # Gather specified regional activity
     region_act = act[..., start_idx:end_idx]
     return region_act
 
-def get_weight_subset(mrnn, start_region=None, end_region=None, start_region_cell_type=None, end_region_cell_type=None):
+def get_weight_subset(mrnn, start_region=None, end_region=None):
+    """ Gather a subset of the weights
+
+    Args:
+        mrnn (_type_): _description_
+        start_region (_type_, optional): _description_. Defaults to None.
+        end_region (_type_, optional): _description_. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
 
     start_idx = 0 
     end_idx = mrnn.total_num_units
@@ -73,9 +73,9 @@ def get_weight_subset(mrnn, start_region=None, end_region=None, start_region_cel
     mrnn_weight = mrnn.apply_dales_law(W_rec, W_rec_mask, W_rec_sign)
 
     if start_region is not None:
-        start_idx, _ = get_region_indices(mrnn, start_region, cell_type=start_region_cell_type)
+        start_idx, _ = get_region_indices(mrnn, start_region)
     if end_region is not None:
-        _, end_idx = get_region_indices(mrnn, end_region, cell_type=end_region_cell_type)
+        _, end_idx = get_region_indices(mrnn, end_region)
 
     weight_subset = mrnn_weight[start_idx:end_idx, 
                                 start_idx:end_idx]
@@ -84,6 +84,17 @@ def get_weight_subset(mrnn, start_region=None, end_region=None, start_region_cel
     return weight_subset
 
 def linearize_trajectory(mrnn, x, start_region, end_region):
+    """ Find jacobian of network Taylor series expansion
+
+    Args:
+        mrnn (_type_): _description_
+        x (_type_): _description_
+        start_region (_type_): _description_
+        end_region (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     
     weight_subset = get_weight_subset(mrnn, start_region, end_region)
 
@@ -102,7 +113,7 @@ def linearize_trajectory(mrnn, x, start_region, end_region):
     
     return jacobian
 
-def get_region_indices(mrnn, region, cell_type=None):
+def get_region_indices(mrnn, region):
     """
     Gets the start and end indices for a specific region in the hidden state vector.
 
@@ -123,21 +134,18 @@ def get_region_indices(mrnn, region, cell_type=None):
             break
         start_idx += region_units
     
-    # If cell type is specified, get the cell type indices
-    if cell_type is not None:
-        for cell in mrnn.region_dict[region].cell_type_info:
-            # Gather necessary information to gather number of units for cell type
-            region_units = mrnn.region_dict[region].num_units
-            cell_percentage = mrnn.region_dict[region].cell_type_info[cell]
-            cell_units = int(round(region_units * cell_percentage))
-            if cell == cell_type:
-                end_idx = start_idx + cell_units
-                break
-            start_idx += cell_units
-        
     return start_idx, end_idx
 
 def get_initial_condition(mrnn, xn):
+    """ Create an initial xn for the network
+
+    Args:
+        mrnn (_type_): _description_
+        xn (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     # Initialize x and h
     for region in mrnn.region_dict:
         start_idx, end_idx = get_region_indices(mrnn, region)
