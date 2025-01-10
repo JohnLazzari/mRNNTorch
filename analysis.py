@@ -11,7 +11,7 @@ from sklearn.decomposition import PCA
 from mRNNTorch.utils import get_region_activity, linearize_trajectory, get_initial_condition
 from tqdm import tqdm
 
-def linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None):
+def linearized_eigendecomposition(mrnn, x, *args):
     """Linearize the network and compute eigenvalues at each timestep
 
     Args:
@@ -28,7 +28,7 @@ def linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None):
         np.array: eigenvectors
     """
 
-    jacobian = linearize_trajectory(mrnn, x, start_region, end_region)
+    jacobian = linearize_trajectory(mrnn, x, *args)
     eigenvalues, eigenvectors = np.linalg.eig(jacobian)
     
     # Split real and imaginary parts
@@ -56,9 +56,9 @@ def psth(mrnn, act, average=True):
     activity_dict = []
     for region in mrnn.region_dict:
         if average == True:
-            mean_act = np.mean(get_region_activity(mrnn, region, act), axis=-1)
+            mean_act = np.mean(get_region_activity(mrnn, act, region), axis=-1)
         else:
-            mean_act = get_region_activity(mrnn, region, act)
+            mean_act = get_region_activity(mrnn, act, region)
         activity_dict.append(mean_act)
     
     return activity_dict
@@ -124,7 +124,7 @@ def flow_field(
     # Gather activity for specified region and cell type
     temp_region_acts = []
     for region in region_list:
-        temp_act_cur = get_region_activity(mrnn, region, trajectory)
+        temp_act_cur = get_region_activity(mrnn, trajectory, region)
         temp_region_acts.append(temp_act_cur)
     temp_act = torch.cat(temp_region_acts, dim=-1)
 
@@ -173,7 +173,7 @@ def flow_field(
         # Get activity for regions of interest
         temp_region_acts = []
         for region in region_list:
-            temp_act_cur = get_region_activity(mrnn, region, h)
+            temp_act_cur = get_region_activity(mrnn, h, region)
             temp_region_acts.append(temp_act_cur)
         cur_region_h = torch.cat(temp_region_acts, dim=-1)
         next_acts[t] = cur_region_h.squeeze().detach().cpu().numpy()

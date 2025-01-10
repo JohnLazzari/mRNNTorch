@@ -3,7 +3,7 @@ from sklearn.decomposition import PCA
 import torch
 import torch.nn.functional as F
 
-def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, stim_strength, batch_size, region_list=None):
+def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, stim_strength, batch_size, *args):
 
     """
     Get inhibitory or excitatory stimulus for optogenetic replication
@@ -21,7 +21,7 @@ def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, st
     """
 
     mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
-    for region in region_list:
+    for region in args:
         cur_mask = stim_strength * (mrnn.region_mask_dict[region])
         mask = mask + cur_mask
     
@@ -34,7 +34,7 @@ def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, st
     
     return inhib_stim
 
-def get_region_activity(mrnn, start_region, act, end_region=None):
+def get_region_activity(mrnn, act, *args):
     """
     Takes in hn and the specified region and returns the activity hn for the corresponding region
 
@@ -45,16 +45,20 @@ def get_region_activity(mrnn, start_region, act, end_region=None):
     Returns:
         region_hn: tensor containing hidden activity only for specified region
     """
-    # Get start and end positions of region
-    start_idx, end_idx = get_region_indices(mrnn, start_region)
+    # Default to returning whole activity
+    if not args:
+        return act
+    # Gather all of the specified region activities in here
+    region_acts = []
     # If end region is specified, make new end_idx
-    if end_region is not None:
-        _, end_idx = get_region_indices(mrnn, end_region)
-    # Gather specified regional activity
-    region_act = act[..., start_idx:end_idx]
-    return region_act
+    for region in args:
+        start_idx, end_idx = get_region_indices(mrnn, region)
+        region_acts.append(act[..., start_idx:end_idx])
+    # Now concatenate all of the region activities
+    region_acts = torch.cat(region_acts, dim=-1)
+    return region_acts
 
-def get_weight_subset(mrnn, start_region=None, end_region=None):
+def get_weight_subset(mrnn, *args, to=None, from_=None):
     """ Gather a subset of the weights
 
     Args:
@@ -66,24 +70,45 @@ def get_weight_subset(mrnn, start_region=None, end_region=None):
         _type_: _description_
     """
 
-    start_idx = 0 
-    end_idx = mrnn.total_num_units
+    # Gather original weight matrix and apply Dale's Law if constrained
+    mrnn_weight, W_rec_mask, W_rec_sign = mrnn.gen_w(mrnn.region_dict)
+    if mrnn.constrained == True:
+        mrnn_weight = mrnn.apply_dales_law(mrnn_weight, W_rec_mask, W_rec_sign)
     
-    W_rec, W_rec_mask, W_rec_sign = mrnn.gen_w(mrnn.region_dict)
-    mrnn_weight = mrnn.apply_dales_law(W_rec, W_rec_mask, W_rec_sign)
-
-    if start_region is not None:
-        start_idx, _ = get_region_indices(mrnn, start_region)
-    if end_region is not None:
-        _, end_idx = get_region_indices(mrnn, end_region)
-
-    weight_subset = mrnn_weight[start_idx:end_idx, 
-                                start_idx:end_idx]
-    weight_subset = weight_subset.detach().cpu().numpy()
+    if to and from_:
+        to_start_idx, to_end_idx = get_region_indices(mrnn, to)
+        from_start_idx, from_end_idx = get_region_indices(mrnn, from_)
+        return mrnn_weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx].detach().cpu().numpy()
     
-    return weight_subset
+    # Default to standard weight matrix if no regions are provided
+    if not args:
+        return mrnn_weight
 
-def linearize_trajectory(mrnn, x, start_region, end_region):
+    # This is used to store the final collected weight matrix
+    global_weight_collection = [] 
+
+    # Loop through each region
+    for src_region in args:
+        # This will be used to collect all of the weights going TO the source region
+        # This should gather weights along columns
+        src_weight_collection = []
+        src_start_idx, src_end_idx = get_region_indices(mrnn, src_region)
+        # Now loop through all connections going TO source region
+        for dst_region in args:
+            # Get the region indices and capture the weight subset
+            dst_start_idx, dst_end_idx = get_region_indices(mrnn, dst_region)
+            weight_subset = mrnn_weight[src_start_idx:src_end_idx, dst_start_idx:dst_end_idx]
+            # Append to src collection
+            src_weight_collection.append(weight_subset)
+        # Concatenate all of the weights in order to create the specified subset as a tensor
+        src_weight_collection = torch.cat(src_weight_collection, dim=1)
+        global_weight_collection.append(src_weight_collection)
+    # Similar to before but now concatenating along rows
+    global_weight_collection = torch.cat(global_weight_collection, dim=0).detach().cpu().numpy()
+    
+    return global_weight_collection
+
+def linearize_trajectory(mrnn, x, *args):
     """ Find jacobian of network Taylor series expansion
 
     Args:
@@ -95,12 +120,10 @@ def linearize_trajectory(mrnn, x, start_region, end_region):
     Returns:
         _type_: _description_
     """
-    
-    weight_subset = get_weight_subset(mrnn, start_region, end_region)
-
+    # Get the subset of the weights required for jacobian 
+    weight_subset = get_weight_subset(mrnn, *args)
     # linearize the dynamics about state
-    x_sub = get_region_activity(mrnn, start_region=start_region, end_region=end_region, act=x) 
-
+    x_sub = get_region_activity(mrnn, x, *args) 
     # Manually computing jacobians
     # Shouldn't be that hard
     if mrnn.activation_name == "relu": 
