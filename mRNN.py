@@ -377,7 +377,14 @@ class mRNN(nn.Module):
             new_xs.append(xn_next)
             new_hs.append(hn_next)
         
-        return torch.stack(new_xs, dim=1), torch.stack(new_hs, dim=1)
+        if self.batch_first:
+            x_final = torch.stack(new_xs, dim=1)
+            h_final = torch.stack(new_hs, dim=1)
+        else:
+            x_final = torch.stack(new_xs, dim=0)
+            h_final = torch.stack(new_hs, dim=0)
+        
+        return x_final, h_final
 
     def __add_region(self, dict, name, num_units, base_firing=0, init=0, device="cuda"):
         """Manually add a region to the network's region_dict
