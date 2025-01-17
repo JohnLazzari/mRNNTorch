@@ -42,7 +42,8 @@ class mRNN(nn.Module):
         noise_level_act=0.01, 
         noise_level_inp=0.01, 
         constrained=True, 
-        t_const=0.1,
+        dt=10,
+        t_const=100,
         batch_first=True,
         lower_bound_rec=0,
         upper_bound_rec=10,
@@ -58,7 +59,9 @@ class mRNN(nn.Module):
         self.region_mask_dict = {}
         self.constrained = constrained
         self.device = device
+        self.dt = dt
         self.t_const = t_const
+        self.alpha = self.dt / self.t_const
         self.batch_first = batch_first
         self.sigma_recur = noise_level_act
         self.sigma_input = noise_level_inp
@@ -337,8 +340,8 @@ class mRNN(nn.Module):
             # Calculate noise terms
             if noise:
                 # Calculate noise constants
-                const_hid = np.sqrt(2 * self.t_const * self.sigma_recur**2)
-                const_inp = np.sqrt(2 * self.t_const * self.sigma_input**2)
+                const_hid = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_recur**2)
+                const_inp = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_input**2)
                 # Sample from normal distribution and scale by constant term
                 # Separate noise levels will be applied to each neuron/input
                 perturb_hid = const_hid * torch.randn(size=(self.total_num_units,), device=self.device)
@@ -349,8 +352,9 @@ class mRNN(nn.Module):
                 perturb_hid = perturb_inp = 0
 
             # Update hidden state
+            # Discretized equation of the form: x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)
             xn_next = (xn_next 
-                        + self.t_const 
+                        + self.alpha 
                         * (-xn_next
                             + (W_rec @ hn_next.T).T
                             + self.baseline_inp
@@ -360,23 +364,25 @@ class mRNN(nn.Module):
 
             # Add input to the network
             if self.batch_first:
-                xn_next = xn_next + self.t_const * (W_inp @ inp[:, t, :].T).T
+                xn_next = xn_next + self.alpha * (W_inp @ inp[:, t, :].T).T
                 # Add any remaining inputs without weights
                 # Example of when this would be useful is for optogenetic manipulations
                 for idx in range(len(args)):
-                    xn_next = xn_next + self.t_const * args[idx][:, t, :]
+                    xn_next = xn_next + self.alpha * args[idx][:, t, :]
             else:
                 # Same as above but for different shaped input
-                xn_next = xn_next + self.t_const * (W_inp @ inp[t, :, :].T).T
+                xn_next = xn_next + self.alpha * (W_inp @ inp[t, :, :].T).T
                 for idx in range(len(args)):
-                    xn_next = xn_next + self.t_const * args[idx][t, :, :]
+                    xn_next = xn_next + self.alpha * args[idx][t, :, :]
 
             # Compute activation
             # Gather activation and pre-activation into lists
+            # Activation of the form: h_t = sigma(x_t)
             hn_next = self.activation(xn_next)
             new_xs.append(xn_next)
             new_hs.append(hn_next)
         
+        # Correct the final output sizes based on input shape
         if self.batch_first:
             x_final = torch.stack(new_xs, dim=1)
             h_final = torch.stack(new_hs, dim=1)
