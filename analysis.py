@@ -56,7 +56,7 @@ def psth(mrnn, act, average=True):
     activity_dict = []
     for region in mrnn.region_dict:
         if average == True:
-            mean_act = np.mean(get_region_activity(mrnn, act, region), axis=-1)
+            mean_act = torch.mean(get_region_activity(mrnn, act, region), axis=-1)
         else:
             mean_act = get_region_activity(mrnn, act, region)
         activity_dict.append(mean_act)
@@ -74,6 +74,7 @@ def flow_field(
     lower_bound_y=-10,
     upper_bound_y=10,
     region_list=None,
+    stim_input=None,
     linearize=False
 ):
     """ Generate flow fields and energy landscapes of mRNN activity
@@ -159,7 +160,7 @@ def flow_field(
             x_0_flow.append(grid[..., grid_region_idx:grid_region_idx + mrnn.region_dict[region].num_units])
             grid_region_idx += mrnn.region_dict[region].num_units
         else:
-            x_0_flow.append(get_region_activity(mrnn, region, full_act_batch))
+            x_0_flow.append(get_region_activity(mrnn, full_act_batch, region))
     x_0_flow = torch.cat(x_0_flow, dim=-1)
             
     # Now going through 
@@ -169,7 +170,11 @@ def flow_field(
             inp_t = inp[:, t:t+1, :]
             # Get activity for current timestep
             # Since we are changing the initial condition at each timestep, we need to iterate through each timestep here
-            _, h = mrnn(x_0_flow[:, t, :], inp_t, noise=False)
+            if stim_input is not None:
+                stim_input_t = stim_input[:, t:t+1, :]
+                _, h = mrnn(x_0_flow[:, t, :], inp_t, stim_input_t, noise=False)
+            else:
+                _, h = mrnn(x_0_flow[:, t, :], inp_t, noise=False)
         # Get activity for regions of interest
         temp_region_acts = []
         for region in region_list:

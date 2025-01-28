@@ -1,9 +1,10 @@
 import numpy as np
 from sklearn.decomposition import PCA
 import torch
+import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
-def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, stim_strength, batch_size, *args):
+def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, stim_strength, batch_size, n_steps_rampup, n_steps_rampdown, *args):
 
     """
     Get inhibitory or excitatory stimulus for optogenetic replication
@@ -20,19 +21,25 @@ def manipulation_stim(mrnn, start_silence, end_silence, seq_len, extra_steps, st
         batch_size:                 Number of conditions to be included in the sequence
     """
 
-    mask = torch.zeros(size=(mrnn.total_num_units,), device="cuda")
+    mask = torch.zeros(size=(mrnn.total_num_units,), device=mrnn.device)
     for region in args:
-        cur_mask = stim_strength * (mrnn.region_mask_dict[region])
-        mask = mask + cur_mask
+        mask = mask + mrnn.region_mask_dict[region]
     
+    total_stim_time = (end_silence - start_silence) - n_steps_rampup - n_steps_rampdown
     # Inhibitory/excitatory stimulus to network, designed as an input current
     # It applies the inhibitory stimulus to all of the conditions specified in data (or max_seq_len) equally
-    inhib_stim_pre = torch.zeros(size=(batch_size, start_silence, mrnn.total_num_units), device="cuda")
-    inhib_stim_silence = torch.ones(size=(batch_size, end_silence - start_silence, mrnn.total_num_units), device="cuda") * mask
-    inhib_stim_post = torch.zeros(size=(batch_size, (seq_len - end_silence) + extra_steps, mrnn.total_num_units), device="cuda")
-    inhib_stim = torch.cat([inhib_stim_pre, inhib_stim_silence, inhib_stim_post], dim=1)
-    
-    return inhib_stim
+    stim_pre = torch.zeros(size=(batch_size, start_silence, mrnn.total_num_units), device=mrnn.device)
+    if n_steps_rampup > 0:
+        stim_ramp_up = torch.linspace(0, stim_strength, n_steps_rampup).unsqueeze(0).unsqueeze(2).to(mrnn.device)
+        stim_ramp_up = stim_ramp_up.repeat(batch_size, 1, mrnn.total_num_units) * mask
+    stim_const = torch.ones(size=(batch_size, total_stim_time, mrnn.total_num_units), device=mrnn.device) * mask * stim_strength
+    if n_steps_rampdown > 0:
+        stim_ramp_down = torch.linspace(stim_strength, 0, n_steps_rampdown).unsqueeze(0).unsqueeze(2).to(mrnn.device)
+        stim_ramp_down = stim_ramp_down.repeat(batch_size, 1, mrnn.total_num_units) * mask
+    stim_post = torch.zeros(size=(batch_size, (seq_len - end_silence) + extra_steps, mrnn.total_num_units), device=mrnn.device)
+    stim = torch.cat([stim_pre, stim_ramp_up, stim_const, stim_ramp_down, stim_post], dim=1)
+
+    return stim
 
 def get_region_activity(mrnn, act, *args):
     """
@@ -120,6 +127,7 @@ def linearize_trajectory(mrnn, x, *args):
     Returns:
         _type_: _description_
     """
+    assert x.dim() == 1
     # Get the subset of the weights required for jacobian 
     weight_subset = get_weight_subset(mrnn, *args)
     # linearize the dynamics about state
