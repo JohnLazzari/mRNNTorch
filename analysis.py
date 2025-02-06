@@ -27,9 +27,8 @@ def linearized_eigendecomposition(mrnn, x, *args):
         list: Imaginary eigenvalues
         np.array: eigenvectors
     """
-
     jacobian = linearize_trajectory(mrnn, x, *args)
-    eigenvalues, eigenvectors = np.linalg.eig(jacobian)
+    eigenvalues, eigenvectors = torch.linalg.eig(jacobian)
     
     # Split real and imaginary parts
     reals = []

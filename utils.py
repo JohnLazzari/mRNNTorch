@@ -85,7 +85,7 @@ def get_weight_subset(mrnn, *args, to=None, from_=None):
     if to and from_:
         to_start_idx, to_end_idx = get_region_indices(mrnn, to)
         from_start_idx, from_end_idx = get_region_indices(mrnn, from_)
-        return mrnn_weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx].detach().cpu().numpy()
+        return mrnn_weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx]
     
     # Default to standard weight matrix if no regions are provided
     if not args:
@@ -111,11 +111,11 @@ def get_weight_subset(mrnn, *args, to=None, from_=None):
         src_weight_collection = torch.cat(src_weight_collection, dim=1)
         global_weight_collection.append(src_weight_collection)
     # Similar to before but now concatenating along rows
-    global_weight_collection = torch.cat(global_weight_collection, dim=0).detach().cpu().numpy()
+    global_weight_collection = torch.cat(global_weight_collection, dim=0)
     
     return global_weight_collection
 
-def linearize_trajectory(mrnn, x, *args):
+def linearize_trajectory(mrnn, x, *args, W_inp=None):
     """ Find jacobian of network Taylor series expansion
 
     Args:
@@ -138,9 +138,12 @@ def linearize_trajectory(mrnn, x, *args):
         x_act = F.relu(x_sub)
         d_x_act = torch.where(x_act > 0, 1., 0.)
         d_x_act_diag = torch.diag(d_x_act)
-        jacobian = d_x_act_diag @ weight_subset.T
+        jacobian = d_x_act_diag @ weight_subset
+        if W_inp != None:
+            jacobian_inp = d_x_act_diag @ W_inp
+            return jacobian, jacobian_inp
     elif mrnn.activation_name == "linear":
-        jacobian = weight_subset.T
+        jacobian = weight_subset
     
     return jacobian
 
