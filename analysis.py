@@ -33,11 +33,11 @@ def linearized_eigendecomposition(mrnn, x, *args):
     # Split real and imaginary parts
     reals = []
     for eigenvalue in eigenvalues:
-        reals.append(eigenvalue.real)
+        reals.append(eigenvalue.real.item())
 
     ims = []
     for eigenvalue in eigenvalues:
-        ims.append(eigenvalue.imag)
+        ims.append(eigenvalue.imag.item())
 
     return reals, ims, eigenvectors
 
@@ -74,6 +74,7 @@ def flow_field(
     upper_bound_y=10,
     region_list=None,
     stim_input=None,
+    cancel_other_regions=False,
     linearize=False
 ):
     """ Generate flow fields and energy landscapes of mRNN activity
@@ -159,7 +160,11 @@ def flow_field(
             x_0_flow.append(grid[..., grid_region_idx:grid_region_idx + mrnn.region_dict[region].num_units])
             grid_region_idx += mrnn.region_dict[region].num_units
         else:
-            x_0_flow.append(get_region_activity(mrnn, full_act_batch, region))
+            if cancel_other_regions == True:
+                full_batch_region_temp = get_region_activity(mrnn, full_act_batch, region)
+                x_0_flow.append(torch.zeros_like(full_batch_region_temp))
+            else:
+                x_0_flow.append(get_region_activity(mrnn, full_act_batch, region))
     x_0_flow = torch.cat(x_0_flow, dim=-1)
             
     # Now going through 
