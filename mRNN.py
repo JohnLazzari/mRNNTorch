@@ -331,8 +331,10 @@ class mRNN(nn.Module):
         # Specify sequence length defined by input
         if self.batch_first:
             seq_len = inp.shape[1]
+            batch_shape = inp.shape[0]
         else:
             seq_len = inp.shape[0]
+            batch_shape = inp.shape[1]
         
         # Process sequence
         for t in range(seq_len):
@@ -344,10 +346,8 @@ class mRNN(nn.Module):
                 const_inp = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_input**2)
                 # Sample from normal distribution and scale by constant term
                 # Separate noise levels will be applied to each neuron/input
-                perturb_hid = const_hid * torch.randn(size=(self.total_num_units,), device=self.device)
-                perturb_inp = const_inp * torch.randn(size=(self.total_num_inputs,), device=self.device)
-                # Apply input noise
-                inp = inp + perturb_inp
+                perturb_hid = const_hid * torch.randn(size=(batch_shape, self.total_num_units), device=self.device)
+                perturb_inp = const_inp * torch.randn(size=(batch_shape, self.total_num_inputs), device=self.device)
             else:
                 perturb_hid = perturb_inp = 0
 
@@ -364,14 +364,17 @@ class mRNN(nn.Module):
 
             # Add input to the network
             if self.batch_first:
-                xn_next = xn_next + self.alpha * (W_inp @ inp[:, t, :].T).T
+                # Apply input noise
+                inp_t = inp[:, t, :] + perturb_inp
+                xn_next = xn_next + self.alpha * (W_inp @ inp_t.T).T
                 # Add any remaining inputs without weights
                 # Example of when this would be useful is for optogenetic manipulations
                 for idx in range(len(args)):
                     xn_next = xn_next + self.alpha * args[idx][:, t, :]
             else:
                 # Same as above but for different shaped input
-                xn_next = xn_next + self.alpha * (W_inp @ inp[t, :, :].T).T
+                inp_t = inp[:, t, :] + perturb_inp
+                xn_next = xn_next + self.alpha * (W_inp @ inp_t.T).T
                 for idx in range(len(args)):
                     xn_next = xn_next + self.alpha * args[idx][t, :, :]
 
