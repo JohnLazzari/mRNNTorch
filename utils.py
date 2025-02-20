@@ -53,12 +53,18 @@ def get_region_activity(mrnn, act, *args):
         region_hn: tensor containing hidden activity only for specified region
     """
     # Default to returning whole activity
+    unique_regions = set(args)
     if not args:
         return act
     # Gather all of the specified region activities in here
     region_acts = []
+    # Go and check if any parent regions are entered
+    for region in unique_regions.copy():
+        if __check_if_parent_region(mrnn, region) == True:
+            unique_regions.remove(region)
+            unique_regions.update(__get_child_regions(mrnn, region))
     # If end region is specified, make new end_idx
-    for region in args:
+    for region in unique_regions:
         start_idx, end_idx = get_region_indices(mrnn, region)
         region_acts.append(act[..., start_idx:end_idx])
     # Now concatenate all of the region activities
@@ -158,6 +164,8 @@ def get_region_indices(mrnn, region):
         tuple: (start_idx, end_idx)
     """
     
+    if __check_if_parent_region(mrnn, region):
+        raise ValueError("Can only get indices of a single region, not parent region")
     # Get the region indices
     start_idx = 0
     end_idx = 0
@@ -185,3 +193,34 @@ def get_initial_condition(mrnn, xn):
         start_idx, end_idx = get_region_indices(mrnn, region)
         xn[..., start_idx:end_idx] = mrnn.region_dict[region].init
     return xn
+
+def __check_if_parent_region(mrnn, parent_region):
+    """ Check if the given region is a parent region or not
+
+    Args:
+        mrnn (_type_): _description_
+        region (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    for region in mrnn.region_dict.values():
+        if region.parent_region == parent_region:
+            return True
+    return False
+
+def __get_child_regions(mrnn, parent_region):
+    """ Check if the given region is a parent region or not
+
+    Args:
+        mrnn (_type_): _description_
+        region (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    child_region_list = []
+    for region in mrnn.region_dict:
+        if mrnn.region_dict[region].parent_region == parent_region:
+            child_region_list.append(region)
+    return tuple(child_region_list)

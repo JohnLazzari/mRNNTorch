@@ -22,7 +22,7 @@ class Region(nn.Module):
         masks (dict): Masks for each cell type and region properties (e.g., full mask, zero mask).
     """
     
-    def __init__(self, num_units, base_firing, init, device):
+    def __init__(self, num_units, device="cuda"):
         """
         Initializes the Region class.
         
@@ -35,9 +35,7 @@ class Region(nn.Module):
         super(Region, self).__init__()
 
         self.num_units = num_units
-        self.init = init * torch.ones(size=(self.num_units,))
         self.device = device
-        self.base_firing = base_firing * torch.ones(size=(num_units,))
         self.connections = {}
         self.masks = {}
 
@@ -66,6 +64,7 @@ class Region(nn.Module):
             upper_bound (float, optional):          Upper bound for uniform weight initialization.
         """
         assert dst_region_name not in self.connections
+        self.__assert_projection_type(dst_region)
         connection_properties = {}
 
         # Initialize connection parameters
@@ -143,6 +142,9 @@ class Region(nn.Module):
 
         return weight_mask, sign_matrix
 
+    def __assert_projection_type(self, dst_region):
+        assert isinstance(dst_region, RecurrentRegion)
+
     def has_connection_to(self, region):
         """
         Checks if there is a connection from the current region to the specified region.
@@ -154,3 +156,42 @@ class Region(nn.Module):
             bool: True if there is a connection, otherwise False.
         """
         return region in self.connections
+
+
+#############################################################################################################
+
+
+class RecurrentRegion(Region):
+    def __init__(self, num_units, base_firing, init, device="cuda", parent_region=None, learnable_bias=False):
+        super(RecurrentRegion, self).__init__(
+            num_units, 
+            device=device
+        )
+        """ Recurrent Region Class (mostly inherits from base Region class)
+        
+            Params:
+                num_units:
+                base_firing:
+                init:
+                device:
+                parent_region:
+                learnable_bias:
+        """
+
+        self.init = init * torch.ones(size=(self.num_units,))
+        self.learnable_bias = learnable_bias
+        self.parent_region = parent_region
+
+        if learnable_bias is True:
+            self.base_firing = nn.Parameter(base_firing * torch.ones(size=(num_units,)))
+        else:
+            self.base_firing = base_firing * torch.ones(size=(num_units,))
+
+
+#############################################################################################################
+
+
+class InputRegion(Region):
+    def __init__(self, num_units, device="cuda"):
+        # Implements base region class
+        super(RecurrentRegion, self).__init__(num_units, device=device)

@@ -41,7 +41,7 @@ def linearized_eigendecomposition(mrnn, x, *args):
 
     return reals, ims, eigenvectors
 
-def psth(mrnn, act, average=True):
+def psth(mrnn, act, *args, average=True):
     """Gather the PSTH for each region in the network
 
     Args:
@@ -53,7 +53,7 @@ def psth(mrnn, act, average=True):
     """
         
     activity_dict = []
-    for region in mrnn.region_dict:
+    for region in args:
         if average == True:
             mean_act = torch.mean(get_region_activity(mrnn, act, region), axis=-1)
         else:
