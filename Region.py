@@ -194,4 +194,4 @@ class RecurrentRegion(Region):
 class InputRegion(Region):
     def __init__(self, num_units, device="cuda"):
         # Implements base region class
-        super(RecurrentRegion, self).__init__(num_units, device=device)
+        super(InputRegion, self).__init__(num_units, device=device)

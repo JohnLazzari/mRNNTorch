@@ -110,7 +110,8 @@ class mRNN(nn.Module):
                     base_firing=region["base_firing"],
                     init=region["init"],
                     device=self.device,
-                    parent_region=region["parent_region"]
+                    parent_region=region["parent_region"],
+                    learnable_bias=region["learnable_bias"]
                 )
 
             # Generate recurrent connections
@@ -167,7 +168,7 @@ class mRNN(nn.Module):
         self.total_num_units = self.__get_total_num_units(self.region_dict)
         # Registering bias parameters
         if isinstance(self.region_dict[name].base_firing, nn.Parameter):
-            self.register_parameter(f"{region}_base_firing", self.region_dict[region].base_firing)
+            self.register_parameter(f"{name}_base_firing", self.region_dict[name].base_firing)
         # Get indices for specific regions
         for region in self.region_dict:
             # Get the mask for the whole region, regardless of cell type
@@ -408,7 +409,7 @@ class mRNN(nn.Module):
                     xn_next = xn_next + self.alpha * args[idx][:, t, :]
             else:
                 # Same as above but for different shaped input
-                inp_t = inp[:, t, :] + perturb_inp
+                inp_t = inp[t, :, :] + perturb_inp
                 xn_next = xn_next + self.alpha * (W_inp @ inp_t.T).T
                 for idx in range(len(args)):
                     xn_next = xn_next + self.alpha * args[idx][t, :, :]
