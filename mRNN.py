@@ -448,6 +448,8 @@ class mRNN(nn.Module):
                 region["base_firing"] = 0
             if "parent_region" not in region:
                 region["parent_region"] = None
+            if "learnable_bias" not in region:
+                region["learnable_bias"] = False
 
         # Set default values for recurrent region connections
         for connection in config["recurrent_connections"]:
