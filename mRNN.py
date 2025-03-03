@@ -9,6 +9,35 @@ import matplotlib.pyplot as plt
 import json
 from mRNNTorch.Region import RecurrentRegion, InputRegion
 
+DEFAULT_REC_REGIONS = {
+    # Name of the region
+    "name": "region_",
+    # Initial condition of region (xn)
+    "init": 0,
+    # bias or baseline firing of region
+    "base_firing": 0,
+    # Parent class or family region belongs to (for cell types)
+    "parent_region": None,
+    # Whether or not the base firing will be trainable
+    "learnable_bias": False
+}
+
+DEFAULT_REC_CONNECTIONS = {
+    # Whether connection is excitatory or inhibitory
+    "sign": "exc",
+    # How sparse the connections will be (float from 0-1)
+    "sparsity": None
+}
+
+DEFAULT_INP_REGIONS = {
+    "name": "inp_"
+}
+
+DEFAULT_INP_CONNECTIONS = {
+    "sign": "exc",
+    "sparsity": None
+}
+
 def linear(x):
     return x
 
@@ -96,8 +125,11 @@ class mRNN(nn.Module):
                 config = json.load(f)
             
             # Only the recurrent regions need to be specified
+            # This should default all connectivity to zeros (not learnable)
+            config.setdefault('recurrent_connections', {})
+            config.setdefault('input_connections', {})
             assert "recurrent_regions" in config
-            assert "recurrent_connections" in config
+            assert "input_regions" in config
             
             # Generate network structure
             self.__create_def_values(config)
@@ -144,6 +176,44 @@ class mRNN(nn.Module):
             # By adding zeros where explicity connections are not specified.
             # Does so for both recurrent and input connections
             self.finalize_connectivity()
+    
+    def connectivity_matrix(self, matrix):
+        """ Will set connections based on connectivity matrix
+            The order of the matrix should come from the order 
+            in which the regions were added either in the config or using
+            add_recurrent_region() explicitly
+
+        Args:
+            matrix (torch.Tensor): matrix filled with ones, zeros, negative ones, or floats for sparse connections. 
+                                    Matrix is R x R where R is number of regions in region_dict
+        """
+        rec_dict_items = list(self.region_dict.items())
+        
+        # Going through matrix rows
+        # This corresponds to (To)
+        for idx_1 in range(matrix.shape[0]):
+            # Going through matrix columns
+            # This corresponds to (From)
+            for idx_2 in range(matrix.shape[1]):
+                # Skip if matrix value is zero
+                if matrix[idx_1, idx_2] == 0:
+                    continue
+                # Check if connections are excitatory
+                if matrix[idx_1, idx_2] > 0:
+                    self.add_recurrent_connection(
+                        src_region=rec_dict_items[idx_1][0],
+                        dst_region=rec_dict_items[idx_2][0],
+                        sign="exc",
+                        sparsity=1-matrix[idx_1, idx_2]
+                    )
+                # Check if connections are inhibitory
+                elif matrix[idx_1, idx_2] < 0:
+                    self.add_recurrent_connection(
+                        src_region=rec_dict_items[idx_1][0],
+                        dst_region=rec_dict_items[idx_2][0],
+                        sign="inhib",
+                        sparsity=1-matrix[idx_1, idx_2]
+                    )
     
     def add_recurrent_region(self, name, num_units, base_firing=0, init=0, device="cuda", parent_region=None, learnable_bias=False):
         """_summary_
@@ -440,35 +510,37 @@ class mRNN(nn.Module):
         
         # Set default values for recurrent region connections
         for i, region in enumerate(config["recurrent_regions"]):
-            if "name" not in region:
-                region["name"] = f"region_{i}"
-            if "init" not in region:
-                region["init"] = 0
-            if "base_firing" not in region:
-                region["base_firing"] = 0
-            if "parent_region" not in region:
-                region["parent_region"] = None
-            if "learnable_bias" not in region:
-                region["learnable_bias"] = False
+            # Go through all possible default options in default dict
+            for param in DEFAULT_REC_REGIONS:
+                # If the parameter is not specified by the user in the configuration...
+                if param not in region:
+                    # If parameter is name, add the index to ensure unique naming
+                    if param == "name":
+                        region[param] = DEFAULT_REC_REGIONS[param] + str(i)
+                    # Otherwise, default the parameter
+                    else:
+                        region[param] = DEFAULT_REC_REGIONS[param]
 
         # Set default values for recurrent region connections
         for connection in config["recurrent_connections"]:
-            if "sign" not in connection:
-                connection["sign"] = "exc"
-            if "sparsity" not in connection:
-                connection["sparsity"] = 0
+            for param in DEFAULT_REC_CONNECTIONS:
+                if param not in connection:
+                    connection[param] = DEFAULT_REC_CONNECTIONS[param]
 
         # Set default values for input regions
         for i, region in enumerate(config["input_regions"]):
-            if "name" not in region:
-                region["name"] = f"input_{i}"
+            for param in DEFAULT_INP_REGIONS:
+                if param not in region:
+                    if param == "name":
+                        region[param] = DEFAULT_INP_REGIONS[param] + str(i)
+                    else:
+                        region[param] = DEFAULT_INP_REGIONS[param]
 
         # Set default values for input region connections
         for connection in config["input_connections"]:
-            if "sign" not in connection:
-                connection["sign"] = "exc"
-            if "sparsity" not in connection:
-                connection["sparsity"] = 0
+            for param in DEFAULT_INP_CONNECTIONS:
+                if param not in connection:
+                    connection[param] = DEFAULT_INP_CONNECTIONS[param]
 
     def __gen_region_mask(self, region):
         """
