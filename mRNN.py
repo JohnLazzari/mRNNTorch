@@ -177,44 +177,6 @@ class mRNN(nn.Module):
             # Does so for both recurrent and input connections
             self.finalize_connectivity()
     
-    def connectivity_matrix(self, matrix):
-        """ Will set connections based on connectivity matrix
-            The order of the matrix should come from the order 
-            in which the regions were added either in the config or using
-            add_recurrent_region() explicitly
-
-        Args:
-            matrix (torch.Tensor): matrix filled with ones, zeros, negative ones, or floats for sparse connections. 
-                                    Matrix is R x R where R is number of regions in region_dict
-        """
-        rec_dict_items = list(self.region_dict.items())
-        
-        # Going through matrix rows
-        # This corresponds to (To)
-        for idx_1 in range(matrix.shape[0]):
-            # Going through matrix columns
-            # This corresponds to (From)
-            for idx_2 in range(matrix.shape[1]):
-                # Skip if matrix value is zero
-                if matrix[idx_1, idx_2] == 0:
-                    continue
-                # Check if connections are excitatory
-                if matrix[idx_1, idx_2] > 0:
-                    self.add_recurrent_connection(
-                        src_region=rec_dict_items[idx_1][0],
-                        dst_region=rec_dict_items[idx_2][0],
-                        sign="exc",
-                        sparsity=1-matrix[idx_1, idx_2]
-                    )
-                # Check if connections are inhibitory
-                elif matrix[idx_1, idx_2] < 0:
-                    self.add_recurrent_connection(
-                        src_region=rec_dict_items[idx_1][0],
-                        dst_region=rec_dict_items[idx_2][0],
-                        sign="inhib",
-                        sparsity=1-matrix[idx_1, idx_2]
-                    )
-    
     def add_recurrent_region(self, name, num_units, base_firing=0, init=0, device="cuda", parent_region=None, learnable_bias=False):
         """_summary_
 
