@@ -53,18 +53,31 @@ class Region(nn.Module):
         Adds a connection from the current region to a specified projection region.
         
         Args:
-            proj_region_name (str):                 Name of the region that the current region connects to.
-            proj_region (Region):                   The target region to which the connection is made.
-            src_region_cell_type (str):             The source region's cell type.
-            dst_region_cell_type (str):             The destination region's cell type.
+            dst_region_name (str):                  Name of the region that the current region connects to.
+            dst_region (Region):                    The target region to which the connection is made.
             sign (str):                             Specifies if the connection is excitatory or inhibitory ('inhib' for inhibitory).
             sparsity (float):                       Specifies how sparse the connections are (defualts to none otherwise)
             zero_connection (bool, optional):       If True, no connections are created (default is False).
-            lower_bound (float, optional):          Lower bound for uniform weight initialization.
-            upper_bound (float, optional):          Upper bound for uniform weight initialization.
         """
-        assert dst_region_name not in self.connections
+
+        """
+        Check to make sure users are not duplicating connections
+        Currently, this may lead to complications since the parameter will not be registered if it already exists
+        Additionally, users will likely never need to duplicate a connection and this may signal an error on their part
+        Therefore this can also act as a check to ensure proper connectivity is maintained
+        Only raise this exception when the connection is not a zero connection
+        """
+        if dst_region_name in self.connections:
+            if self.connections[dst_region_name]["zero_connection"] is False:
+                raise Exception("Connection is already registered as parameter")
+                
+        """
+        Here we will assert that users are only making connections from:
+            1. recurrent region -> recurrent region
+            2. input region -> recurrent region
+        """
         self.__assert_projection_type(dst_region)
+        # Store all connection parameters in this dictionary
         connection_properties = {}
 
         # Initialize connection parameters
@@ -78,28 +91,15 @@ class Region(nn.Module):
             sparse_tensor = torch.empty_like(parameter, device=self.device)
             nn.init.sparse_(sparse_tensor, sparsity)
             sparse_tensor[sparse_tensor != 0] = 1
-
-            sparse_tensor_src = sparse_tensor
-            sparse_tensor_dst = sparse_tensor.T
         else:
-            sparse_tensor_src = torch.ones_like(parameter, device=self.device)
-            sparse_tensor_dst = torch.ones_like(parameter, device=self.device).T
+            sparse_tensor = torch.ones_like(parameter, device=self.device)
 
         # Store trainable parameter
         connection_properties["parameter"] = parameter
-
         # Initialize connection tensors (1s for active connections, 0s for no connections)
-        connection_tensor_src = torch.ones_like(parameter, device=self.device) if not zero_connection else torch.zeros_like(parameter, device=self.device)
-        connection_tensor_dst = torch.ones_like(parameter, device=self.device).T if not zero_connection else torch.zeros_like(parameter, device=self.device).T
-
+        connection_tensor = torch.ones_like(parameter, device=self.device) if not zero_connection else torch.zeros_like(parameter, device=self.device)
         # Create weight masks based on cell types, if specified
-        weight_mask_src, sign_matrix_src = self.__get_weight_and_sign_matrices(connection_tensor_src, sparse_tensor_src)
-        weight_mask_dst, sign_matrix_dst = dst_region.__get_weight_and_sign_matrices(connection_tensor_dst, sparse_tensor_dst)
-
-        # Combine masks
-        # Transpose the dst matrices since they should correspond to row operations
-        weight_mask = weight_mask_src * weight_mask_dst.T
-        sign_matrix = sign_matrix_src * sign_matrix_dst.T
+        weight_mask, sign_matrix = self.__get_weight_and_sign_matrices(connection_tensor, sparse_tensor)
 
         # Adjust the sign matrix for inhibitory connections
         if sign == "inhib":
@@ -110,6 +110,7 @@ class Region(nn.Module):
         # Store weight mask and sign matrix
         connection_properties["weight_mask"] = weight_mask.to(self.device)
         connection_properties["sign_matrix"] = sign_matrix.to(self.device)
+        connection_properties["zero_connection"] = zero_connection
         self.connections[dst_region_name] = connection_properties
 
         # Manually register parameters
@@ -159,6 +160,7 @@ class Region(nn.Module):
 
 
 #############################################################################################################
+# Recurrent Region
 
 
 class RecurrentRegion(Region):
@@ -189,6 +191,7 @@ class RecurrentRegion(Region):
 
 
 #############################################################################################################
+# Input Region
 
 
 class InputRegion(Region):
