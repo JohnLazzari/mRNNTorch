@@ -1,70 +1,126 @@
 # mRNNTorch
-***
-
 **Welcome to mRNNTorch!**
 This small Python package allows users to effectively build and analyze multi-regional recurrent neural networks (mRNNs) in PyTorch. The `mRNN` module works similar to PyTorch's `nn.RNN` module and can be included in any custom network inheriting from `nn.Module`. Given the complexity of manually building and collecting weight matrices, mRNNTorch provides a solution to automize this process by letting the user specify their network configuration for fast prototyping!
 
 ## Usage
-***
-There are three primary modules a user might need to use, including the `mRNN`, `analysis`, and `utils` modules.
 ### mRNN
----
-To build an mRNN, first build a json configuration file specifying the recurrent regions and connections between regions, in addition to input regions and their connections to recurrent regions. Input regions simply represent a particular input and its connections (weight matrix) to the recurrent regions specified by the user, however mRNNTorch offers multiple inputs to be specified and passed into the nework, each going to a particular set of desired regions. Example configuration files can be found in the `examples` folder. Once a configuration is specified, the `mRNN` module can be used as such
+There are two primary ways to build an mRNN using mRNNTorch
+
+1. Specify a json configuration file with recurrent and input regions and connections
+2. Manually design the mRNN within your own custom model
+
+Additionally, users can mix and match approaches. Json files are convenient for saving previous model configuations and easily reusing, however manually entering many connections can be cumbersome. Defining connections in your own custom model may be less flexible across configurations, but can allow for ease of model definition.
+
+**Note:** When passing a configuration into the model, both recurrent and input regions must be specified at the minimum. 
+
+Below we provide example usage cases:
 ```python
 from mRNNTorch.mRNN import mRNN
 
+# Only using configuration
 class MyMRNN(nn.Module):
     def __init__(self, config):
         super(MyMRNN, self).__init__()
         
+        """
+            Model is fully defined by configuration
+            including regions and connections
+        """
         self.mrnn = mRNN(config)
     
-    forward(self, xn, input):
-        xn, hn = self.mrnn(xn, input)
+    forward(self, xn, inp):
+        xn, hn = self.mrnn(xn, inp)
         return hn
 ```
-The full model definition is given as
+
 ```python
-mRNN(config, activation="relu", noise_level_act=0.01, noise_level_inp=0.01, constrained=True, 
-t_const=0.1, batch_first=True, lower_bound_rec=0, upper_bound_rec=10, lower_bound_inp=0, 
-upper_bound_inp=10, device="cuda",)
+from mRNNTorch.mRNN import mRNN
+
+# Only using manual entry
+class MyMRNN(nn.Module):
+    def __init__(self, input_units, r1_units, r2_units):
+        super(MyMRNN, self).__init__()
+        
+        # pass in any other parameters as needed
+        self.mrnn = mRNN()
+
+        # Add recurrent and input regions
+        self.mrnn.add_recurrent_region("r1", r1_units)
+        self.mrnn.add_recurrent_region("r2", r2_units)
+        self.mrnn.add_input_region("input", input_units)
+
+        # Add connections between regions
+        self.mrnn.add_input_connection("input", "r1")
+        self.mrnn.add_input_connection("input", "r2")
+
+        """
+            As opposed to manually entering four connections
+            we can loop through this process dynamically
+            This is beneficial when the number of connections 
+            grows very large
+        """
+
+        # Assuming r1 is excitatory and r2 inhibitory
+        # For an unconstrained network sign will be ignored
+        connection_props = {"r1": {"sign": "exc"}, 
+                            "r2": {"sign": "inhib"}}
+        for src_region in connection_props:
+            for dst_region in connection_props:
+                self.mrnn.add_recurrent_connection(
+                    src_region,
+                    dst_region,
+                    sign=connection_props[src_region]["sign"]
+                )
+        # This is necessary after manually defining connections
+        # Using finalize_connections() will pad undefined 
+        # connections between regions with zeros
+        # Otherwise, you will run into an error
+        self.mrnn.finalize_connectivity()
+    
+    forward(self, xn, inp):
+        xn, hn = self.mrnn(xn, inp)
+        return hn
 ```
-The parameter `constrained=True` specifies if Dale's law is to be used by the network, with limits on the weights given by the lower and upper bound parameters.
+
+```python
+from mRNNTorch.mRNN import mRNN
+
+# Mix of config and manual entry
+class MyMRNN(nn.Module):
+    def __init__(self, config):
+        super(MyMRNN, self).__init__()
+        
+        """
+            Here, our config defines our regions and
+            the input connections
+            If we don't define recurrent connections in 
+            the config, we can still enter them here.
+        """
+        self.mrnn = mRNN(config)
+
+        connection_props = {"r1": {"sign": "exc"}, 
+                            "r2": {"sign": "inhib"}}
+
+        for src_region in connection_props:
+            for dst_region in connection_props:
+                self.mrnn.add_recurrent_connection(
+                    src_region,
+                    dst_region,
+                    sign=connection_props[src_region]["sign"]
+                )
+        self.mrnn.finalize_connectivity()
+    
+    forward(self, xn, inp):
+        xn, hn = self.mrnn(xn, inp)
+        return hn
+```
 
 The forward pass of the model is defined as
-```python
-forward(xn, *args, noise=True)
-```
-The parameter `xn` is the preactivation, and an initial activation `hn` will automatically be applied by taking `self.activation(xn)`. An arbitrary amount of arguments can be passed which corresponds to input to the network. The first `N` arguments passed will have weights defined by the first `N` input regions specified in the configuration file. Any other inputs passed into the network after `N` arguments will not have weights, but will still be applied to the network activity. This is useful if additional inputs need to be given for different experiments that don't require input weights, such as optogenetic manipulation.
-
-### Analysis
----
-We currently have three analysis tools, including an eigendecomposition of the linearized network, collection of average peri-stimulus time histograms (PSTHs), and flow fields / energy landscapes. The definitions are provided below:
-**Note: each of the following definitions requires an mRNN object, not a custom network containing an mRNN object**
-```python
-linearized_eigendecomposition(mrnn, x, start_region=None, end_region=None, 
-start_cell_type=None, end_cell_type=None):
-```
-This function requires an mRNN object and a set of pre-activation states x (with which a non-linearity will be applied to get hn). This function allows the user to gather a subset of the weights and cell types for analysis as opposed to solely the whole network.
 
 ```python
-psth(mrnn, act):
+forward(xn, inp, *args, noise=True)
 ```
-This function simply takes in an mRNN object and the activity of each region throughout a trajectory and returns the average activity in each individual region.
 
-```python
-flow_field(mrnn, timesteps, dimensions, time_skips, num_points, lower_bound_x, upper_bound_x, 
-lower_bound_y, upper_bound_y, inp, start_region=None, end_region=None, 
-start_region_cell_type=None, end_region_cell_type=None, linearize=False
-):
-```
-Flow field will return a list of velocities for the dimensions specified in addition to the speed of the network at different points on a grid. This can then be used to plot flow fields and energy landscapes using matplotlib. This function requires an mRNN object, the number of timesteps to analyze, the number of dimensions to reduce activity to (using PCA), how many time skips should be included while generating the velocities, number of points on the x and y axis of the low dimensional grid, the bounds of this grid, and the input that will be given to the network to generate a trajectory. Additionally, start and end regions may be specified to gather flow fields for particular regions only. In this case, flow fields for the specified regions will be generated assuming the non-included regions have the activity levels during the trajectory specified by the input.
-
-### Utils
-Similar to analysis, there are provided utility functions that take in mRNN objects. The provided utility functions are the following:
-* `manipulation_stim`
-* `get_region_activity`
-* `get_weight_subset`
-* `linearize_trajectory`
+The parameter `xn` is the preactivation, and an initial activation `hn` will automatically be a copy of `xn`. The second argument corresponds to the network input of shape `[batch, length, neurons]` for `batch_first = True` and the alternative otherwise. An arbitrary amount of arguments can be passed which corresponds to additional input to the network not containing weights. 
 
 **This repository is still undergoing major changes, feel free to contribute!**
