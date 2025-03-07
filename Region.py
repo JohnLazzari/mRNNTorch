@@ -22,19 +22,19 @@ class Region(nn.Module):
         masks (dict): Masks for each cell type and region properties (e.g., full mask, zero mask).
     """
     
-    def __init__(self, num_units, device="cuda"):
+    def __init__(self, num_units, sign="pos", device="cuda"):
         """
         Initializes the Region class.
         
         Args:
             num_units (int): Number of neurons in the region.
-            base_firing (float): Baseline firing rate for the region.
+            sign (str): sign of weights, should be None, exc, or inhib
             device (torch.device): The device ('cpu' or 'cuda').
-            cell_types (dict, optional): A dictionary specifying the proportions of different cell types in the region.
         """
         super(Region, self).__init__()
 
         self.num_units = num_units
+        self.sign = sign
         self.device = device
         self.connections = {}
         self.masks = {}
@@ -45,7 +45,6 @@ class Region(nn.Module):
         self, 
         dst_region_name, 
         dst_region, 
-        sign, 
         sparsity,
         zero_connection=False, 
     ):
@@ -102,10 +101,12 @@ class Region(nn.Module):
         weight_mask, sign_matrix = self.__get_weight_and_sign_matrices(connection_tensor, sparse_tensor)
 
         # Adjust the sign matrix for inhibitory connections
-        if sign == "inhib":
+        if self.sign == "pos":
+            sign_matrix *= 1
+        elif self.sign == "neg":
             sign_matrix *= -1
-        elif sign is None:
-            sign_matrix = torch.zeros_like(parameter).to(self.device)
+        else:
+            raise ValueError("sign can only be (pos) or (neg)")
 
         # Store weight mask and sign matrix
         connection_properties["weight_mask"] = weight_mask.to(self.device)
@@ -164,11 +165,8 @@ class Region(nn.Module):
 
 
 class RecurrentRegion(Region):
-    def __init__(self, num_units, base_firing, init, device="cuda", parent_region=None, learnable_bias=False):
-        super(RecurrentRegion, self).__init__(
-            num_units, 
-            device=device
-        )
+    def __init__(self, num_units, base_firing, init, sign="pos", device="cuda", parent_region=None, learnable_bias=False):
+        super(RecurrentRegion, self).__init__(num_units, sign=sign, device=device)
         """ Recurrent Region Class (mostly inherits from base Region class)
         
             Params:
@@ -195,6 +193,6 @@ class RecurrentRegion(Region):
 
 
 class InputRegion(Region):
-    def __init__(self, num_units, device="cuda"):
+    def __init__(self, num_units, sign="pos", device="cuda"):
         # Implements base region class
-        super(InputRegion, self).__init__(num_units, device=device)
+        super(InputRegion, self).__init__(num_units, sign=sign, device=device)

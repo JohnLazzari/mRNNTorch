@@ -56,11 +56,15 @@ def get_region_activity(mrnn, act, *args):
     unique_regions = set(args)
     if not args:
         return act
+    # Check to ensure region is recurrent
+    for region in args:
+        if region in mrnn.inp_dict:
+            raise Exception("Can only get activity for recurrent regions")
     # Gather all of the specified region activities in here
     region_acts = []
     # Go and check if any parent regions are entered
     for region in unique_regions.copy():
-        if __check_if_parent_region(mrnn, region) == True:
+        if __check_if_parent_region(mrnn, region):
             unique_regions.remove(region)
             unique_regions.update(__get_child_regions(mrnn, region))
     # If end region is specified, make new end_idx
@@ -83,19 +87,67 @@ def get_weight_subset(mrnn, *args, to=None, from_=None):
         _type_: _description_
     """
 
+    # Store regions if parent regions are given    
+    to_regions = []
+    from_regions = []
+
+    if to and from_:
+
+        # If to region is a parent region, then get children regions
+        if __check_if_parent_region(mrnn, to):
+            to_regions.extend(__get_child_regions(mrnn, to))
+        else:
+            to_regions.append(to)
+        # If from region is a parent region, then get children regions
+        if __check_if_parent_region(mrnn, from_):
+            from_regions.extend(__get_child_regions(mrnn, from_))
+        else:
+            from_regions.append(from_)
+        
+        # Check which weight matrix to use based on from region
+        if from_ in mrnn.region_dict:
+            # Gather recurrent weight matrix
+            weight, mask, sign = mrnn.gen_w(mrnn.region_dict)
+            if mrnn.constrained == True:
+                weight = mrnn.apply_dales_law(weight, mask, sign)
+        else:
+            # Gather input weight matrix
+            weight, mask, sign = mrnn.gen_w(mrnn.inp_dict)
+            if mrnn.constrained == True:
+                weight = mrnn.apply_dales_law(weight, mask, sign)
+        
+        # Store all of the weights to region from another
+        to_from_weight = []
+        # Now go through each of the collected regions and get the weights
+        for to_region in to_regions:
+            from_weight = []
+            # Get the indices for to region
+            to_start_idx, to_end_idx = get_region_indices(mrnn, to_region)
+            for from_region in from_regions:
+                # Gather indices
+                from_start_idx, from_end_idx = get_region_indices(mrnn, from_region)
+                from_weight.append(weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx])
+            # Collect all of the weights for from region
+            collected_from_weight = torch.cat(from_weight, dim=1)
+            to_from_weight.append(collected_from_weight)
+        # Collect final weight matrix
+        collected_to_from_weight = torch.cat(to_from_weight, dim=0)
+        return collected_to_from_weight
+
     # Gather original weight matrix and apply Dale's Law if constrained
+    # Can only be recurrent if not using to and from
     mrnn_weight, W_rec_mask, W_rec_sign = mrnn.gen_w(mrnn.region_dict)
     if mrnn.constrained == True:
         mrnn_weight = mrnn.apply_dales_law(mrnn_weight, W_rec_mask, W_rec_sign)
     
-    if to and from_:
-        to_start_idx, to_end_idx = get_region_indices(mrnn, to)
-        from_start_idx, from_end_idx = get_region_indices(mrnn, from_)
-        return mrnn_weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx]
-    
     # Default to standard weight matrix if no regions are provided
     if not args:
         return mrnn_weight
+    
+    # Check if user specifies input region through args instead of to, from
+    for region in args:
+        if region in mrnn.inp_dict:
+            raise Exception("Can only gather input subsets using to and from arguments")
 
     # This is used to store the final collected weight matrix
     global_weight_collection = [] 
@@ -169,7 +221,17 @@ def get_region_indices(mrnn, region):
     # Get the region indices
     start_idx = 0
     end_idx = 0
-    for cur_reg in mrnn.region_dict:
+
+    # Check whether or not specified region is input or rec
+    # This is to handle indices for both rec and inp regions
+    if region in mrnn.region_dict:
+        dict_ = mrnn.region_dict
+    elif region in mrnn.inp_dict:
+        dict_ = mrnn.inp_dict
+    else:
+        raise Exception("Not an input or recurrent region")
+
+    for cur_reg in dict_:
         region_units = mrnn.region_dict[cur_reg].num_units
         if cur_reg == region:
             end_idx = start_idx + region_units

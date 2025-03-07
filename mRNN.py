@@ -11,6 +11,8 @@ DEFAULT_REC_REGIONS = {
     "name": "region_",
     # Initial condition of region (xn)
     "init": 0,
+    # Whether connection is excitatory or inhibitory
+    "sign": "pos",
     # bias or baseline firing of region
     "base_firing": 0,
     # Parent class or family region belongs to (for cell types)
@@ -20,8 +22,6 @@ DEFAULT_REC_REGIONS = {
 }
 
 DEFAULT_REC_CONNECTIONS = {
-    # Whether connection is excitatory or inhibitory
-    "sign": "exc",
     # How sparse the connections will be (float from 0-1)
     "sparsity": None
 }
@@ -31,7 +31,6 @@ DEFAULT_INP_REGIONS = {
 }
 
 DEFAULT_INP_CONNECTIONS = {
-    "sign": "exc",
     "sparsity": None
 }
 
@@ -76,6 +75,7 @@ class mRNN(nn.Module):
         lower_bound_inp=0,
         upper_bound_inp=10,
         spectral_radius=None,
+        config_finalize=True,
         device="cuda",
     ):
         super(mRNN, self).__init__()
@@ -98,6 +98,7 @@ class mRNN(nn.Module):
         self.lower_bound_inp = lower_bound_inp
         self.upper_bound_inp = upper_bound_inp
         self.spectral_radius = spectral_radius
+        self.config_finalize = config_finalize
         self.rec_finalized = False
         self.inp_finalized = False
         
@@ -125,42 +126,61 @@ class mRNN(nn.Module):
             with open(config, 'r') as f:
                 config = json.load(f)
             
-            # Only the recurrent regions need to be specified
+            # Default everything to empty dict
+            # Nothing inherently needs to be specified and can instead be created in custom network
             # This should default all connectivity to zeros (not learnable)
+            config.setdefault('recurrent_regions', {})
+            config.setdefault('input_regions', {})
             config.setdefault('recurrent_connections', {})
             config.setdefault('input_connections', {})
-            assert "recurrent_regions" in config
-            assert "input_regions" in config
             
-            # We are currently only instantiating regions
-            # This will allow for flexibility in creating connections
-            # Users can use configurations to assign regions and build connections
-            # more flexibly within their model
-            # Of course, regions can instead be built within models, and 
-            # connections can be specified in configurations if needed
+            """
+                Configuration file protocol:
+                
+                    Here we are allowing flexibility between using configs vs. custom network definitions.
+                    None of the regions or connections in the network need to be fully specified in the config.
+                    Users can specify some regions and connections in the config, then define the rest manually if
+                    they choose.
+                    
+                    config_finalize is defaulted to True, this assumes that the connections in the configuration
+                    define all of the connections in the network, and that the network will be finalized automatically 
+                    after passing the config. Users can set this to False to continue to build regions and 
+                    connections in their custom model after passing the config.
+
+                    Lastly, an empty config that is passed in(or empty parts of the config) default to an empty dictionary {}. 
+                    In this case, any key in the json file that is empty will not affect the network or be defined at all.
+                    These missing pieces must then be defined in the custom model. Connections that are defined in the 
+                    config without the corresponding regions being defined will give an error.
+                    Additionally, the config file itself defaults to None, which would then imply the user needs to
+                    manually enter all regions and connections in the custom model.
+            """
             
             # Generate network structure
             self.__create_def_values(config)
 
-            # Generate recurrent regions
-            for region in config["recurrent_regions"]:
-                self.add_recurrent_region(
-                    name=region["name"],
-                    num_units=region["num_units"],
-                    base_firing=region["base_firing"],
-                    init=region["init"],
-                    device=self.device,
-                    parent_region=region["parent_region"],
-                    learnable_bias=region["learnable_bias"]
-                )
+            if len(config["recurrent_regions"]) >= 1:
+                # Generate recurrent regions
+                for region in config["recurrent_regions"]:
+                    self.add_recurrent_region(
+                        name=region["name"],
+                        num_units=region["num_units"],
+                        sign=region["sign"],
+                        base_firing=region["base_firing"],
+                        init=region["init"],
+                        device=self.device,
+                        parent_region=region["parent_region"],
+                        learnable_bias=region["learnable_bias"]
+                    )
             
-            # Generate input regions
-            for region in config["input_regions"]:
-                self.add_input_region(
-                    name=region["name"],
-                    num_units=region["num_units"],
-                    device=self.device
-                )
+            if len(config["input_regions"]) >= 1:
+                # Generate input regions
+                for region in config["input_regions"]:
+                    self.add_input_region(
+                        name=region["name"],
+                        num_units=region["num_units"],
+                        sign=region["sign"],
+                        device=self.device
+                    )
 
             # Now checking whether or not connections are specified in config
             if len(config["recurrent_connections"]) >= 1:
@@ -169,13 +189,18 @@ class mRNN(nn.Module):
                     self.add_recurrent_connection(
                         src_region=connection["src_region"],
                         dst_region=connection["dst_region"],
-                        sign=connection["sign"],
                         sparsity=connection["sparsity"]
                     )
-                # This completes the connections matrix between regions 
-                # By adding zeros where explicity connections are not specified.
-                # Does so for both recurrent and input connections
-                self.finalize_rec_connectivity()
+                """
+                    Finalization for Configuration:
+
+                        This completes the connections matrix between regions 
+                        by padding with zeros where explicit connections are not specified.
+                        Does so for both recurrent and input connections.
+                """
+
+                if self.config_finalize:
+                    self.finalize_rec_connectivity()
 
             if len(config["input_connections"]) >= 1:
                 # Generate input connections
@@ -183,13 +208,23 @@ class mRNN(nn.Module):
                     self.add_input_connection(
                         src_region=connection["src_region"],
                         dst_region=connection["dst_region"],
-                        sign=connection["sign"],
                         sparsity=connection["sparsity"]
                     )
-                # For input regions
-                self.finalize_inp_connectivity()
+                # Finalization input regions
+                if self.config_finalize:
+                    self.finalize_inp_connectivity()
     
-    def add_recurrent_region(self, name, num_units, base_firing=0, init=0, device="cuda", parent_region=None, learnable_bias=False):
+    def add_recurrent_region(
+        self, 
+        name, 
+        num_units, 
+        sign=DEFAULT_REC_REGIONS["sign"], 
+        base_firing=DEFAULT_REC_REGIONS["base_firing"], 
+        init=DEFAULT_REC_REGIONS["init"], 
+        device="cuda", 
+        parent_region=DEFAULT_REC_REGIONS["parent_region"], 
+        learnable_bias=DEFAULT_REC_REGIONS["learnable_bias"]
+    ):
         """_summary_
 
         Args:
@@ -200,10 +235,14 @@ class mRNN(nn.Module):
             device (str, optional): _description_. Defaults to "cuda".
             cell_types (dict, optional): _description_. Defaults to {}.
         """
+        if self.rec_finalized:
+            raise Exception("Recurrent connectivity already finalized, please include all regions and connections beforehand")
+
         self.region_dict[name] = RecurrentRegion(
             num_units=num_units,
             base_firing=base_firing,
             init=init,
+            sign=sign,
             device=device,
             parent_region=parent_region,
             learnable_bias=learnable_bias
@@ -219,7 +258,13 @@ class mRNN(nn.Module):
             self.region_mask_dict[region] = {}
             self.region_mask_dict[region] = self.__gen_region_mask(region)
 
-    def add_input_region(self, name, num_units, device="cuda"):
+    def add_input_region(
+        self, 
+        name, 
+        num_units, 
+        sign=DEFAULT_INP_REGIONS["sign"], 
+        device="cuda"
+    ):
         """_summary_
 
         Args:
@@ -230,13 +275,17 @@ class mRNN(nn.Module):
             device (str, optional): _description_. Defaults to "cuda".
             cell_types (dict, optional): _description_. Defaults to {}.
         """
+        if self.inp_finalized:
+            raise Exception("Input connectivity already finalized, please include all regions and connections beforehand")
+
         self.inp_dict[name] = InputRegion(
             num_units=num_units,
+            sign=sign,
             device=device
         )
         self.total_num_inputs = self.__get_total_num_units(self.inp_dict)
     
-    def add_recurrent_connection(self, src_region, dst_region, sign="exc", sparsity=None):
+    def add_recurrent_connection(self, src_region, dst_region, sparsity=DEFAULT_REC_CONNECTIONS["sparsity"]):
         """_summary_
 
         Args:
@@ -252,7 +301,6 @@ class mRNN(nn.Module):
         self.region_dict[src_region].add_connection(
             dst_region_name=dst_region,
             dst_region=self.region_dict[dst_region],
-            sign=sign,
             sparsity=sparsity
         )
         # Register current connection as parameter
@@ -265,7 +313,7 @@ class mRNN(nn.Module):
                 # Register parameter manually
                 self.register_parameter(param_name, param)
 
-    def add_input_connection(self, src_region, dst_region, sign="exc", sparsity=None):
+    def add_input_connection(self, src_region, dst_region, sparsity=DEFAULT_INP_CONNECTIONS["sparsity"]):
         """_summary_
 
         Args:
@@ -281,7 +329,6 @@ class mRNN(nn.Module):
         self.inp_dict[src_region].add_connection(
             dst_region_name=dst_region,
             dst_region=self.region_dict[dst_region],
-            sign=sign,
             sparsity=sparsity
         )
         # Register all parameters for inputs
@@ -357,10 +404,10 @@ class mRNN(nn.Module):
         """_summary_
 
         Args:
-            weight (_type_): _description_
+            weight (torch.Tensor): recurrent weight matrix
 
         Returns:
-            _type_: _description_
+            float: spectral radius of weight
         """
         # Largest absolute eigenvalue of W_rec
         eig_vals = torch.linalg.eigvals(weight)
@@ -391,7 +438,9 @@ class mRNN(nn.Module):
             sign_matrix_from_region = []
 
             for connection in self.region_dict:
+                # gather all connection properties
                 region_data = dict_[cur_region].connections[connection]
+                # collect parameter and associated masks
                 connections_from_region.append(region_data["parameter"])
                 weight_mask_from_region.append(region_data["weight_mask"])
                 sign_matrix_from_region.append(region_data["sign_matrix"])
@@ -450,24 +499,12 @@ class mRNN(nn.Module):
         # Apply Dale's Law if constrained
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
         if self.constrained:
-            W_rec = self.apply_dales_law(
-                W_rec, 
-                W_rec_mask, 
-                W_rec_sign_matrix, 
-                lower_bound=self.lower_bound_rec, 
-                upper_bound=self.upper_bound_rec
-            )
+            W_rec = self.apply_dales_law(W_rec, W_rec_mask, W_rec_sign_matrix, self.lower_bound_rec, self.upper_bound_rec)
         
         # Apply to input weights as well
         W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
         if self.constrained:
-            W_inp = self.apply_dales_law(
-                W_inp, 
-                W_inp_mask, 
-                W_inp_sign_matrix,
-                lower_bound=self.lower_bound_inp, 
-                upper_bound=self.upper_bound_inp
-            )
+            W_inp = self.apply_dales_law(W_inp, W_inp_mask, W_inp_sign_matrix, self.lower_bound_inp, self.upper_bound_inp)
         
         baseline_inp = self.get_tonic_inp()
         
@@ -620,7 +657,6 @@ class mRNN(nn.Module):
                 region.add_connection(
                     dst_region_name=other_region,
                     dst_region=self.region_dict[other_region],
-                    sign=None,
                     sparsity=None,
                     zero_connection=True
                 )
