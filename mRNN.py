@@ -27,7 +27,8 @@ DEFAULT_REC_CONNECTIONS = {
 }
 
 DEFAULT_INP_REGIONS = {
-    "name": "inp_"
+    "name": "inp_",
+    "sign": "pos"
 }
 
 DEFAULT_INP_CONNECTIONS = {
