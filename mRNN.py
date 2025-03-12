@@ -478,6 +478,24 @@ class mRNN(nn.Module):
             torch.Tensor: Vector of baseline firing rates
         """
         return torch.cat([region.base_firing for region in self.region_dict.values()]).to(self.device) 
+    
+    def named_rec_regions(self, prefix=''):
+        """ Loop through rec region names and objects
+
+        Args:
+            prefix (str, optional): Defaults to ''.
+        """
+        for name, region in self.region_dict.items():
+            yield prefix + name, region
+
+    def named_inp_regions(self, prefix=''):
+        """ Loop through inp region names and objects
+
+        Args:
+            prefix (str, optional): Defaults to ''.
+        """
+        for name, region in self.inp_dict.items():
+            yield prefix + name, region
 
     def forward(self, xn, inp, *args, noise=True):
         """
