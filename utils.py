@@ -173,7 +173,7 @@ def get_weight_subset(mrnn, *args, to=None, from_=None):
     
     return global_weight_collection
 
-def linearize_trajectory(mrnn, x, *args, W_inp=None):
+def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
     """ Find jacobian of network Taylor series expansion
 
     Args:
@@ -190,18 +190,39 @@ def linearize_trajectory(mrnn, x, *args, W_inp=None):
     weight_subset = get_weight_subset(mrnn, *args)
     # linearize the dynamics about state
     x_sub = get_region_activity(mrnn, x, *args) 
-    # Manually computing jacobians
-    # Shouldn't be that hard
+
+    # Manually computing jacobians for now
+    """
+        Taking jacobian of x with respect to F
+        In this case, the form should be:
+            J_(ij)(x) = -I_(ij) + W_(ij)h'(x_j)
+    """
+
     if mrnn.activation_name == "relu": 
+
+        # Identity representing -x in state equation
+        I = torch.eye(n=x_sub.shape[0], device=mrnn.device)
+
+        # Implementing h'(x), diagonalize to multiply by W
         x_act = F.relu(x_sub)
-        d_x_act = torch.where(x_act > 0, 1., 0.)
+        d_x_act = torch.where(x_act > 0., 1., 0.)
         d_x_act_diag = torch.diag(d_x_act)
-        jacobian = d_x_act_diag @ weight_subset
+
+        d_x_act_diag = d_x_act_diag.to(torch.float64)
+        weight_subset = weight_subset.to(torch.float64)
+
+        # Get final jacobian using form above
+        jacobian = (I - alpha * I) + alpha * (d_x_act_diag @ weight_subset)
+
+        # If an input weight is specified
         if W_inp != None:
-            jacobian_inp = d_x_act_diag @ W_inp
+            # No need for identity in this case
+            jacobian_inp = alpha * W_inp
             return jacobian, jacobian_inp
+
     elif mrnn.activation_name == "linear":
-        jacobian = weight_subset
+        # Linear network jacobian is the same
+        jacobian = (I - alpha * I) + alpha * weight_subset
     
     return jacobian
 
@@ -232,7 +253,7 @@ def get_region_indices(mrnn, region):
         raise Exception("Not an input or recurrent region")
 
     for cur_reg in dict_:
-        region_units = mrnn.region_dict[cur_reg].num_units
+        region_units = dict_[cur_reg].num_units
         if cur_reg == region:
             end_idx = start_idx + region_units
             break
