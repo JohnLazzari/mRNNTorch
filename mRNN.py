@@ -77,7 +77,7 @@ class mRNN(nn.Module):
         upper_bound_inp=10,
         spectral_radius=None,
         config_finalize=True,
-        device="cuda",
+        device="cuda"
     ):
         super(mRNN, self).__init__()
 
