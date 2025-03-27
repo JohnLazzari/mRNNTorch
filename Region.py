@@ -66,6 +66,7 @@ class Region(nn.Module):
         Therefore this can also act as a check to ensure proper connectivity is maintained
         Only raise this exception when the connection is not a zero connection
         """
+
         if dst_region_name in self.connections:
             if self.connections[dst_region_name]["zero_connection"] is False:
                 raise Exception("Connection is already registered as parameter")
@@ -80,43 +81,52 @@ class Region(nn.Module):
         connection_properties = {}
 
         # Initialize connection parameters
-        if not zero_connection:
-            parameter = nn.Parameter(torch.empty(size=(dst_region.num_units, self.num_units), device=self.device))
-        else:
-            parameter = torch.zeros(size=(dst_region.num_units, self.num_units), device=self.device)
+        parameter = torch.zeros(size=(dst_region.num_units, self.num_units), device=self.device)
+        # Even though parameter is zero use this specifically to zero out the weight and sign matrix if zero connection
+        # This is just to be extra safe to ensure everything about this connection is zero
+        zero_con_mask = torch.zeros_like(parameter)
         
         # Initialize sparse mask if sparsity is given
         if sparsity is not None:
-            sparse_tensor = torch.empty_like(parameter, device=self.device)
-            nn.init.sparse_(sparse_tensor, sparsity)
-            sparse_tensor[sparse_tensor != 0] = 1
+            weight_mask = torch.empty_like(parameter, device=self.device)
+            nn.init.sparse_(weight_mask, sparsity)
+            weight_mask[weight_mask != 0] = 1
         else:
-            sparse_tensor = torch.ones_like(parameter, device=self.device)
-
-        # Store trainable parameter
-        connection_properties["parameter"] = parameter
-        # Initialize connection tensors (1s for active connections, 0s for no connections)
-        connection_tensor = torch.ones_like(parameter, device=self.device) if not zero_connection else torch.zeros_like(parameter, device=self.device)
-        # Create weight masks based on cell types, if specified
-        weight_mask, sign_matrix = self.__get_weight_and_sign_matrices(connection_tensor, sparse_tensor)
+            weight_mask = torch.ones_like(parameter, device=self.device)
 
         # Adjust the sign matrix for inhibitory connections
         if self.sign == "pos":
-            sign_matrix *= 1
+            sign_matrix = weight_mask
         elif self.sign == "neg":
-            sign_matrix *= -1
+            sign_matrix = -weight_mask
         else:
             raise ValueError("sign can only be (pos) or (neg)")
+        
+        """ In the case of zero connection, everything from parameter, mask, and sign will be zero in
+            connections_dict. Additionally, they won't be registered as parameters, so nothing will be 
+            initialized in the mRNN class either. This should ensure everything is always zero.
+        """
+        if zero_connection:
+            weight_mask *= zero_con_mask
+            sign_matrix *= zero_con_mask
 
         # Store weight mask and sign matrix
+        # Store trainable parameter
+        connection_properties["parameter"] = parameter
         connection_properties["weight_mask"] = weight_mask.to(self.device)
         connection_properties["sign_matrix"] = sign_matrix.to(self.device)
         connection_properties["zero_connection"] = zero_connection
+
+        # Add all of the properties to define the connection in Region class
         self.connections[dst_region_name] = connection_properties
 
-        # Manually register parameters
+        # Manually register parameters if not a zero connection
         if not zero_connection:
-            self.register_parameter(dst_region_name, self.connections[dst_region_name]["parameter"])
+            # Register the main parameter denoting weights of model
+            # Next, register the mask and sign matrix as parameters to ensure they're loaded in the same
+            self.register_parameter(dst_region_name, nn.Parameter(self.connections[dst_region_name]["parameter"]))
+            self.register_parameter(f"{dst_region_name}_weight_mask", nn.Parameter(self.connections[dst_region_name]["weight_mask"], requires_grad=False))
+            self.register_parameter(f"{dst_region_name}_sign_matrix", nn.Parameter(self.connections[dst_region_name]["sign_matrix"], requires_grad=False))
 
     def __generate_masks(self):
         """
@@ -127,22 +137,6 @@ class Region(nn.Module):
 
         self.masks["ones"] = full_mask
         self.masks["zeros"] = zero_mask
-
-    def __get_weight_and_sign_matrices(self, connection_tensor, sparse_tensor):
-        """
-        Retrieves the weight mask and sign matrix for a specified cell type.
-
-        Args:
-            cell_type (str): The cell type to generate the mask for.
-            connection_tensor (torch.Tensor): Tensor indicating whether connections are active.
-
-        Returns:
-            tuple: weight mask and sign matrix.
-        """
-        weight_mask = sparse_tensor * connection_tensor
-        sign_matrix = sparse_tensor * connection_tensor
-
-        return weight_mask, sign_matrix
 
     def __assert_projection_type(self, dst_region):
         assert isinstance(dst_region, RecurrentRegion)

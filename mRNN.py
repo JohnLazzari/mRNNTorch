@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+from collections import OrderedDict
 from mRNNTorch.Region import RecurrentRegion, InputRegion
 
 DEFAULT_REC_REGIONS = {
@@ -197,7 +198,6 @@ class mRNN(nn.Module):
 
                         This completes the connections matrix between regions 
                         by padding with zeros where explicit connections are not specified.
-                        Does so for both recurrent and input connections.
                 """
 
                 if self.config_finalize:
@@ -307,12 +307,19 @@ class mRNN(nn.Module):
         # Register current connection as parameter
         # Check that we do not register same parameters more than once
         param_name = f"{src_region}_{dst_region}"
+        weight_mask_name = f"{src_region}_{dst_region}_weight_mask"
+        sign_matrix_name = f"{src_region}_{dst_region}_sign_matrix"
+
         for name, param in self.region_dict[src_region].named_parameters():
             if name == dst_region:
                 # Default initialization for recurrent weights
                 self.__constrained_default_init_rec(param) if self.constrained else nn.init.xavier_normal_(param)
                 # Register parameter manually
                 self.register_parameter(param_name, param)
+            elif name == f"{dst_region}_weight_mask":
+                self.register_parameter(weight_mask_name, param)
+            elif name == f"{dst_region}_sign_matrix":
+                self.register_parameter(sign_matrix_name, param)
 
     def add_input_connection(self, src_region, dst_region, sparsity=DEFAULT_INP_CONNECTIONS["sparsity"]):
         """_summary_
@@ -332,14 +339,22 @@ class mRNN(nn.Module):
             dst_region=self.region_dict[dst_region],
             sparsity=sparsity
         )
+
         # Register all parameters for inputs
         param_name = f"{src_region}_{dst_region}"
+        weight_mask_name = f"{src_region}_{dst_region}_weight_mask"
+        sign_matrix_name = f"{src_region}_{dst_region}_sign_matrix"
+
         for name, param in self.inp_dict[src_region].named_parameters():
             if name == dst_region:
                 # Default initialization for inputs
                 self.__constrained_default_init_inp(param) if self.constrained else nn.init.xavier_normal_(param)
                 # Manually register parameter
                 self.register_parameter(param_name, param)
+            elif name == f"{dst_region}_weight_mask":
+                self.register_parameter(weight_mask_name, param)
+            elif name == f"{dst_region}_sign_matrix":
+                self.register_parameter(sign_matrix_name, param)
 
     def set_spectral_radius(self):
         """Set the spectral radius of the recurrent weight matrix
@@ -427,31 +442,24 @@ class mRNN(nn.Module):
                 - W_rec_sign_matrix: Sign constraints for Dale's Law
         """
 
+        # Initialize empty lists to hold the concatenated tensors
         region_connection_columns = []
         region_weight_mask_columns = []
         region_sign_matrix_columns = []
 
+        # Iterate over the regions in dict_
         for cur_region in dict_:
-
-            # Collect connections, masks, and sign matrices for current region
-            connections_from_region = []
-            weight_mask_from_region = []
-            sign_matrix_from_region = []
-
-            for connection in self.region_dict:
-                # gather all connection properties
-                region_data = dict_[cur_region].connections[connection]
-                # collect parameter and associated masks
-                connections_from_region.append(region_data["parameter"])
-                weight_mask_from_region.append(region_data["weight_mask"])
-                sign_matrix_from_region.append(region_data["sign_matrix"])
+            # List comprehensions to collect connections, masks, and sign matrices
+            connections_from_region = [dict_[cur_region].connections[connection]["parameter"] for connection in self.region_dict]
+            weight_mask_from_region = [dict_[cur_region].connections[connection]["weight_mask"] for connection in self.region_dict]
+            sign_matrix_from_region = [dict_[cur_region].connections[connection]["sign_matrix"] for connection in self.region_dict]
             
-            # Concatenate region-specific matrices
+            # Concatenate the region-specific matrices and append to the lists
             region_connection_columns.append(torch.cat(connections_from_region, dim=0))
             region_weight_mask_columns.append(torch.cat(weight_mask_from_region, dim=0))
             region_sign_matrix_columns.append(torch.cat(sign_matrix_from_region, dim=0))
-        
-        # Create final matrices
+
+        # Concatenate all region-specific matrices along the column dimension
         W_rec = torch.cat(region_connection_columns, dim=1)
         W_rec_mask = torch.cat(region_weight_mask_columns, dim=1)
         W_rec_sign = torch.cat(region_sign_matrix_columns, dim=1)
@@ -497,7 +505,199 @@ class mRNN(nn.Module):
         for name, region in self.inp_dict.items():
             yield prefix + name, region
 
-    def forward(self, xn, inp, *args, noise=True):
+    def get_region_activity(self, act, *args):
+        """
+        Takes in hn and the specified region and returns the activity hn for the corresponding region
+
+        Args:
+            region (str): Name of the region
+            hn (Torch.Tensor): tensor containing model hidden activity. Activations must be in last dimension (-1)
+
+        Returns:
+            region_hn: tensor containing hidden activity only for specified region
+        """
+        # Default to returning whole activity
+        unique_regions = list(OrderedDict.fromkeys(args))
+        if not args:
+            return act
+        # Check to ensure region is recurrent
+        for region in args:
+            if region in self.inp_dict:
+                raise Exception("Can only get activity for recurrent regions")
+
+        # Go and check if any parent regions are entered
+        for region in unique_regions.copy():
+            if self.__check_if_parent_region(region):
+                unique_regions.remove(region)
+                unique_regions.extend(self.__get_child_regions(region))
+        
+        # collect all necessary indices now
+        region_indices = {region: self.get_region_indices(region) for region in unique_regions}
+
+        region_acts = torch.cat([
+                act[..., start_idx:end_idx] 
+                for region in unique_regions
+                for (start_idx, end_idx) in [region_indices[region]]
+        ], dim=-1)
+        return region_acts
+
+    def get_weight_subset(self, *args):
+        """ Gather a subset of the weights
+
+        Args:
+            mrnn (_type_): _description_
+            start_region (_type_, optional): _description_. Defaults to None.
+            end_region (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+
+        # Gather original weight matrix and apply Dale's Law if constrained
+        # Can only be recurrent if not using to and from
+        mrnn_weight, W_rec_mask, W_rec_sign = self.gen_w(self.region_dict)
+        if self.constrained == True:
+            mrnn_weight = self.apply_dales_law(mrnn_weight, W_rec_mask, W_rec_sign)
+        
+        # Default to standard weight matrix if no regions are provided
+        if not args:
+            return mrnn_weight
+        
+        # Check if user specifies input region through args instead of to, from
+        for region in args:
+            if region in self.inp_dict:
+                raise Exception("Can only gather input subsets using to and from arguments")
+
+        # This is used to store the final collected weight matrix
+        global_weight_collection = [] 
+
+        region_indices = {region: self.get_region_indices(region) for region in args}
+
+        # List comprehension that gathers all information gathering weight subset
+        global_weight_collection = [
+            torch.cat([
+                        mrnn_weight[src_start_idx:src_end_idx, dst_start_idx:dst_end_idx]
+                        for dst_region in args
+                        for dst_start_idx, dst_end_idx in [region_indices[dst_region]]
+            ], dim=1)
+            for src_region, (src_start_idx, src_end_idx) in region_indices.items()
+        ]
+
+        # Similar to before but now concatenating along rows
+        global_weight_collection = torch.cat(global_weight_collection, dim=0)
+
+        return global_weight_collection
+
+    def get_projection(self, to, from_):
+        """ Gather a subset of the weights
+
+        Args:
+            mrnn (_type_): _description_
+            start_region (_type_, optional): _description_. Defaults to None.
+            end_region (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+
+        # Store regions if parent regions are given    
+        to_regions = []
+        from_regions = []
+
+        # If to region is a parent region, then get children regions
+        if self.__check_if_parent_region(to):
+            to_regions.extend(self.__get_child_regions(to))
+        else:
+            to_regions.append(to)
+        # If from region is a parent region, then get children regions
+        if self.__check_if_parent_region(from_):
+            from_regions.extend(self.__get_child_regions(from_))
+        else:
+            from_regions.append(from_)
+        
+        # Check which weight matrix to use based on from region
+        if from_ in self.region_dict:
+            # Gather recurrent weight matrix
+            weight, mask, sign = self.gen_w(self.region_dict)
+            if self.constrained == True:
+                weight = self.apply_dales_law(weight, mask, sign)
+        else:
+            # Gather input weight matrix
+            weight, mask, sign = self.gen_w(self.inp_dict)
+            if self.constrained == True:
+                weight = self.apply_dales_law(weight, mask, sign)
+        
+        # Store all of the weights to region from another
+        to_from_weight = []
+        # Now go through each of the collected regions and get the weights
+        for to_region in to_regions:
+            from_weight = []
+            # Get the indices for to region
+            to_start_idx, to_end_idx = self.get_region_indices(to_region)
+            for from_region in from_regions:
+                # Gather indices
+                from_start_idx, from_end_idx = self.get_region_indices(from_region)
+                from_weight.append(weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx])
+            # Collect all of the weights for from region
+            collected_from_weight = torch.cat(from_weight, dim=1)
+            to_from_weight.append(collected_from_weight)
+        # Collect final weight matrix
+        collected_to_from_weight = torch.cat(to_from_weight, dim=0)
+        return collected_to_from_weight
+
+    def get_region_indices(self, region):
+        """
+        Gets the start and end indices for a specific region in the hidden state vector.
+
+        Args:
+            region (str): Name of the region
+
+        Returns:
+            tuple: (start_idx, end_idx)
+        """
+        
+        if self.__check_if_parent_region(region):
+            raise ValueError("Can only get indices of a single region, not parent region")
+
+        # Get the region indices
+        start_idx = 0
+        end_idx = 0
+
+        # Check whether or not specified region is input or rec
+        # This is to handle indices for both rec and inp regions
+        if region in self.region_dict:
+            dict_ = self.region_dict
+        elif region in self.inp_dict:
+            dict_ = self.inp_dict
+        else:
+            raise Exception("Not an input or recurrent region")
+
+        for cur_reg in dict_:
+            region_units = dict_[cur_reg].num_units
+            if cur_reg == region:
+                end_idx = start_idx + region_units
+                break
+            start_idx += region_units
+        
+        return start_idx, end_idx
+
+    def get_initial_condition(self, xn):
+        """ Create an initial xn for the network
+
+        Args:
+            mrnn (_type_): _description_
+            xn (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        # Initialize x and h
+        for region in self.region_dict:
+            start_idx, end_idx = self.get_region_indices(region)
+            xn[..., start_idx:end_idx] = self.region_dict[region].init
+        return xn
+
+    def forward(self, x0, inp, *args, noise=True, h0=None):
         """
         Forward pass through the network.
         Implements discretized equation of the form: x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)
@@ -514,6 +714,13 @@ class mRNN(nn.Module):
         """
         assert len(self.region_dict) > 0
         assert len(self.inp_dict) > 0
+        
+        if inp.dim() < 3:
+            raise Exception("input must be 3 dimensional, \
+                            [batch, time, units] for batch_first=True, \
+                            and [time, batch, units] otherwise].")
+        if x0.dim() != 2:
+            raise Exception("x0 must be 2 dimensional, [batch, units].")
 
         # Apply Dale's Law if constrained
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
@@ -527,15 +734,15 @@ class mRNN(nn.Module):
         
         baseline_inp = self.get_tonic_inp()
         
-        xn_next = xn
-        hn_next = xn.clone()
+        xn_next = x0
+        hn_next = self.activation(x0.clone()) if h0 is None else h0
 
         # Create lists for xs and hns
         new_hs = []
         new_xs = []
 
-        # Specify sequence length defined by input
         if self.batch_first:
+            # If batch first then batch is first dim of inp
             seq_len = inp.shape[1]
             batch_shape = inp.shape[0]
         else:
@@ -544,6 +751,12 @@ class mRNN(nn.Module):
         
         # Process sequence
         for t in range(seq_len):
+
+            # Gather input at current timestep
+            if self.batch_first:
+                inp_t = inp[:, t, :]
+            else:
+                inp_t = inp[t, :, :]
 
             # Calculate noise terms
             if noise:
@@ -568,19 +781,13 @@ class mRNN(nn.Module):
                         )
             )
 
-            # Add input to the network
+            # Add input
+            xn_next = xn_next + self.alpha * (W_inp @ (inp_t + perturb_inp).T).T
+
             if self.batch_first:
-                # Apply input noise
-                inp_t = inp[:, t, :] + perturb_inp
-                xn_next = xn_next + self.alpha * (W_inp @ inp_t.T).T
-                # Add any remaining inputs without weights
-                # Example of when this would be useful is for optogenetic manipulations
                 for idx in range(len(args)):
                     xn_next = xn_next + self.alpha * args[idx][:, t, :]
             else:
-                # Same as above but for different shaped input
-                inp_t = inp[t, :, :] + perturb_inp
-                xn_next = xn_next + self.alpha * (W_inp @ inp_t.T).T
                 for idx in range(len(args)):
                     xn_next = xn_next + self.alpha * args[idx][t, :, :]
 
@@ -600,7 +807,7 @@ class mRNN(nn.Module):
             h_final = torch.stack(new_hs, dim=0)
         
         return x_final, h_final
-
+    
     def __create_def_values(self, config):
         """Generate default values for configuration
 
@@ -688,6 +895,37 @@ class mRNN(nn.Module):
             int: Total number of units
         """
         return sum(region.num_units for region in dict_.values())
+
+    def __check_if_parent_region(self, parent_region):
+        """ Check if the given region is a parent region or not
+
+        Args:
+            mrnn (_type_): _description_
+            region (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        for region in self.region_dict.values():
+            if region.parent_region == parent_region:
+                return True
+        return False
+
+    def __get_child_regions(self, parent_region):
+        """ Check if the given region is a parent region or not
+
+        Args:
+            mrnn (_type_): _description_
+            region (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        child_region_list = []
+        for region in self.region_dict:
+            if self.region_dict[region].parent_region == parent_region:
+                child_region_list.append(region)
+        return tuple(child_region_list)
     
     def __constrained_default_init_rec(self, weight):
         """_summary_

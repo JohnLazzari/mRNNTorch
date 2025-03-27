@@ -8,8 +8,64 @@ import math
 import matplotlib.pyplot as plt
 import json
 from sklearn.decomposition import PCA
-from mRNNTorch.utils import get_region_activity, linearize_trajectory, get_initial_condition, get_weight_subset
 from tqdm import tqdm
+from torch.autograd.functional import jacobian
+
+def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
+    """ Find jacobian of network Taylor series expansion
+
+    Args:
+        mrnn (_type_): _description_
+        x (_type_): _description_
+        start_region (_type_): _description_
+        end_region (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    assert x.dim() == 1
+    # Get the subset of the weights required for jacobian 
+    weight_subset = mrnn.get_weight_subset(*args)
+    # linearize the dynamics about state
+    x_sub = mrnn.get_region_activity(x, *args) 
+
+    # Manually computing jacobians for now
+    """
+        Taking jacobian of x with respect to F
+        In this case, the form should be:
+            J_(ij)(x) = -I_(ij) + W_(ij)h'(x_j)
+    """
+    
+    def linear(x):
+        return x
+
+    # Identity representing -x in state equation
+    I = torch.eye(n=x_sub.shape[0], device=mrnn.device)
+
+    # Implementing h'(x), diagonalize to multiply by W
+    if mrnn.activation_name == "relu":
+        d_x_act_diag = jacobian(F.relu, x_sub)
+    elif mrnn.activation_name == "linear":
+        d_x_act_diag = jacobian(linear, x_sub)
+    elif mrnn.activation_name == "tanh":
+        d_x_act_diag = jacobian(F.tanh, x_sub)
+    elif mrnn.activation_name == "sigmoid":
+        d_x_act_diag = jacobian(F.sigmoid, x_sub)
+    elif mrnn.activation_name == "softplus":
+        d_x_act_diag = jacobian(F.softplus, x_sub)
+    else:
+        raise ValueError("not a valid activation function")
+
+    # Get final jacobian using form above
+    jacobian = (I - alpha * I) + alpha * (d_x_act_diag @ weight_subset)
+
+    # If an input weight is specified
+    if W_inp != None:
+        # No need for identity in this case
+        jacobian_inp = alpha * W_inp
+        return jacobian, jacobian_inp
+    
+    return jacobian
 
 def linearized_eigendecomposition(mrnn, x, *args, alpha=1):
     """Linearize the network and compute eigenvalues at each timestep
@@ -41,6 +97,7 @@ def linearized_eigendecomposition(mrnn, x, *args, alpha=1):
 
     return reals, ims, eigenvectors
 
+
 def psth(mrnn, act, *args, average=True):
     """Gather the PSTH for each region in the network
 
@@ -52,16 +109,15 @@ def psth(mrnn, act, *args, average=True):
         Dictionary: Contains average activity for each individual region
     """
         
-    activity_dict = []
+    activity_list = []
     for region in args:
         if average == True:
-            mean_act = torch.mean(get_region_activity(mrnn, act, region), axis=-1)
+            mean_act = torch.mean(mrnn.get_region_activity(act, region), axis=-1)
         else:
-            mean_act = get_region_activity(mrnn, act, region)
-        activity_dict.append(mean_act)
+            mean_act = mrnn.get_region_activity(act, region)
+        activity_list.append(mean_act)
     
-    return activity_dict
-
+    return activity_list
 
 def flow_field(
     mrnn, 
@@ -94,11 +150,28 @@ def flow_field(
     Returns:
         _type_: _description_
     """
+
+    # Properly reshape trajectory if unbatched
+    if trajectory.dim() == 2:
+        if mrnn.batch_first:
+            trajectory = trajectory.unsqueeze(0)    
+        else:
+            trajectory = trajectory.unsqueeze(1)    
+
+    # Properly reshape input if unbatched
+    if inp.dim() == 2:
+        if mrnn.batch_first:
+            inp = inp.unsqueeze(0)    
+        else:
+            inp = inp.unsqueeze(1)    
             
-    # Assuming batch_first=True for now
-    # there must be a batch dimension even if it can only be 1 for now
-    batch_size = trajectory.shape[0]
-    seq_len = trajectory.shape[1]
+    # Get the correct batch and seq len
+    if mrnn.batch_first:
+        batch_size = trajectory.shape[0]
+        seq_len = trajectory.shape[1]
+    else:
+        batch_size = trajectory.shape[1]
+        seq_len = trajectory.shape[0]
 
     # Lists for x and y velocities
     x_vels = []
@@ -112,30 +185,27 @@ def flow_field(
     x_pca = PCA(n_components=2)
 
     # Initialize hidden states
-    xn_temp = torch.zeros(size=(batch_size, mrnn.total_num_units), device="cuda")
-    xn_temp = get_initial_condition(mrnn, xn_temp)
+    xn_temp = torch.zeros(size=(batch_size, mrnn.total_num_units))
+    xn_temp = mrnn.get_initial_condition(xn_temp)
 
     # Gather activity for specified region and cell type
-    temp_region_acts = []
-    for region in region_list:
-        temp_act_cur = get_region_activity(mrnn, trajectory, region)
-        temp_region_acts.append(temp_act_cur)
+    temp_act_cur = [mrnn.get_region_activity(trajectory, region) for region in region_list]
     temp_act = torch.cat(temp_region_acts, dim=-1)
 
     # Reshape activity before performing PCA
     temp_act = torch.reshape(temp_act, shape=(temp_act.shape[0] * temp_act.shape[1], temp_act.shape[2])) 
-    temp_act = temp_act.detach().cpu().numpy()
+    temp_act = temp_act.numpy()
 
     # Do PCA on the specified region(s)
     x_pca.fit(temp_act)
+    reduced_traj = x_pca.fit_transform(temp_act)
 
     # Now going through trajectory
     for t in tqdm(range(1, seq_len, time_skips)):
 
         # We want to find the best grid
         # To do so, find where the last timestep is in pc space and center a grid around that
-        proj = x_pca.transform(temp_act[:t, :])
-        latest_t = proj[-1, :]
+        latest_t = reduced_traj[t, :]
 
         lower_bound_x = np.round(latest_t[0] - x_offset, decimals=1)
         upper_bound_x = np.round(latest_t[0] + x_offset, decimals=1)
@@ -158,16 +228,21 @@ def flow_field(
 
         # Inverse PCA to input grid into network
         grid = x_pca.inverse_transform(data_coords_flatten)
-        grid = grid.clone().detach().cuda()
 
         # Repeat over the sequence length dimension to match activity
         grid = grid.unsqueeze(1).repeat(1, seq_len, 1)
         # Repeat along the batch dimension to match the grid
-        full_act_batch = trajectory.repeat(grid.shape[0], 1, 1).cuda()
+        full_act_batch = trajectory.repeat(grid.shape[0], 1, 1)
 
         # Gather batches of grids with trial activity at each timestep
         grid_region_idx = 0
         x_0_flow = []
+
+        # Precompute non-grid region activities (if cancel_other_regions is True)
+        non_grid_region_activities = {
+            region: torch.zeros_like(mrnn.get_region_activity(full_act_batch, region)) 
+            for region in mrnn.region_dict if region not in region_list and cancel_other_regions
+        }
 
         # In order to get next step activity for grid, each region not being represented
         # By the grid will assume their values from the original trajectory passed in at 
@@ -178,11 +253,10 @@ def flow_field(
                 x_0_flow.append(grid[..., grid_region_idx:grid_region_idx + mrnn.region_dict[region].num_units])
                 grid_region_idx += mrnn.region_dict[region].num_units
             else:
-                if cancel_other_regions == True:
-                    full_batch_region_temp = get_region_activity(mrnn, full_act_batch, region)
-                    x_0_flow.append(torch.zeros_like(full_batch_region_temp))
-                else:
-                    x_0_flow.append(get_region_activity(mrnn, full_act_batch, region))
+                # Get activity for non-specified regions (either from cache or compute)
+                region_activity = non_grid_region_activities.get(region) or mrnn.get_region_activity(full_act_batch, region)
+                x_0_flow.append(region_activity)
+        # Finalize the concatenation
         x_0_flow = torch.cat(x_0_flow, dim=-1)
 
         with torch.no_grad():
@@ -198,11 +272,8 @@ def flow_field(
             _, h = mrnn(x_0_flow[:, t, :], inp_t, stim_input_t, noise=False)
 
         # Get activity for regions of interest
-        temp_region_acts = []
-        for region in region_list:
-            temp_act_cur = get_region_activity(mrnn, h, region)
-            temp_region_acts.append(temp_act_cur)
-        cur_region_h = torch.cat(temp_region_acts, dim=-1).squeeze().detach().cpu().numpy()
+        temp_region_acts = [mrnn.get_region_activity(h, region) for region in region_list]
+        cur_region_h = torch.cat(temp_region_acts, dim=-1).squeeze().numpy()
         
         # Reshape data back to grid
         data_coords = data_coords.numpy()
@@ -229,19 +300,18 @@ def flow_field(
 def linear_flow_field(
     mrnn, 
     trajectory,
-    inp,
     time_skips=1, 
     num_points=50,
     x_offset=1,
     y_offset=1,
     region_list=None,
-    stim_input=None,
-    cancel_other_regions=False,
     alpha=1
 ):
     """ Generate flow fields and energy landscapes of mRNN activity
         Allows for specifying certain subregions to obtain velocities for
         Regions that are not being tested will assume their control activity for given input while gathering specified regional velocities
+        This function currently assumes no external input to the selected regions
+        The flow field will represent the dynamics of the selected regions in isolation
 
     Args:
         mrnn (mRNN): _description_
@@ -259,15 +329,9 @@ def linear_flow_field(
         _type_: _description_
     """
 
-    # Set a random seed for reproducibility
-    np.random.seed(42)
-    torch.use_deterministic_algorithms(True)
-    jac_list = []
-
     # Assuming batch_first=True for now
     # there must be a batch dimension even if it can only be 1 for now
-    batch_size = trajectory.shape[0]
-    seq_len = trajectory.shape[1]
+    seq_len = trajectory.shape[0]
 
     # Lists for x and y velocities
     x_vels = []
@@ -278,33 +342,25 @@ def linear_flow_field(
     speeds = []
 
     # Gather data
-    x_pca = PCA(n_components=2, svd_solver="full", random_state=42, tol=1e-4)
-
-    # Initialize hidden states
-    xn_temp = torch.zeros(size=(batch_size, mrnn.total_num_units))
-    xn_temp = get_initial_condition(mrnn, xn_temp)
+    x_pca = PCA(n_components=2, svd_solver="full")
 
     # Gather activity for specified region and cell type
-    temp_region_acts = []
-    for region in region_list:
-        temp_act_cur = get_region_activity(mrnn, trajectory, region)
-        temp_region_acts.append(temp_act_cur)
+    temp_region_acts = [mrnn.get_region_activity(trajectory, region) for region in region_list]
     temp_act = torch.cat(temp_region_acts, dim=-1)
 
     # Reshape activity before performing PCA
-    temp_act = torch.reshape(temp_act, shape=(temp_act.shape[0] * temp_act.shape[1], temp_act.shape[2])) 
-    temp_act = temp_act.detach().cpu().numpy().astype(np.float64)
+    temp_act = temp_act.detach().cpu()
 
     # Do PCA on the specified region(s)
     x_pca.fit(temp_act)
+    reduced_traj = x_pca.fit_transform(temp_act)
 
     # Now going through trajectory
     for t in tqdm(range(1, seq_len, time_skips)):
 
         # We want to find the best grid
         # To do so, find where the last timestep is in pc space and center a grid around that
-        proj = x_pca.transform(temp_act[:t, :])
-        latest_t = proj[-1, :]
+        latest_t = reduced_traj[t, :]
 
         lower_bound_x = np.round(latest_t[0] - x_offset, decimals=1)
         upper_bound_x = np.round(latest_t[0] + x_offset, decimals=1)
@@ -328,7 +384,7 @@ def linear_flow_field(
         # Inverse PCA to input grid into network
         grid = x_pca.inverse_transform(data_coords_flatten)
         grid = grid.clone().detach()
-        x_0_flow = grid - torch.tensor(temp_act[t, :])
+        x_0_flow = grid - temp_act[t, :]
 
         # In order to get next step activity for grid, each region not being represented
         # By the grid will assume their values from the original trajectory passed in at 
@@ -336,32 +392,16 @@ def linear_flow_field(
         # non-specified regions to the activity tensor to get the full activation for the network
 
         with torch.no_grad():
-            # Current timestep input
-            inp_t = inp[:, t:t+1, :]
-            # Get activity for current timestep
-            # Since we are changing the initial condition at each timestep, we need to iterate through each timestep here
-            if stim_input is not None:
-                stim_input_t = stim_input[:, t:t+1, :]
-            else:
-                stim_input_t = torch.zeros_like(inp_t)
 
-            jac_rec = linearize_trajectory(mrnn, trajectory.squeeze()[t, :], *region_list, alpha=alpha)
-            jac_rec = jac_rec.to(torch.float64)
-            jac_list.append(jac_rec)
+            jac_rec = linearize_trajectory(mrnn, trajectory.squeeze()[t, :], *region_list, alpha=alpha, t=t)
+            h = temp_act[t, :] + (jac_rec @ x_0_flow.T).T
 
-            x_0_flow = x_0_flow.to(torch.float64)
-            h = torch.tensor(temp_act[t, :]) + (jac_rec @ x_0_flow.T).T + stim_input_t.squeeze()
-
-        # Do this to mitigate floating point erros
-        # Subtract to get perturbation in state space
-        h = h.detach().cpu().numpy()
-        
         # Reshape data back to grid
-        data_coords = data_coords.numpy().astype(np.float64)
+        data_coords = data_coords
         data_coords_list.append(data_coords)
 
         cur_region_h = x_pca.transform(h)
-        cur_region_h = np.reshape(cur_region_h, (num_points, num_points, cur_region_h.shape[-1])).astype(np.float64)
+        cur_region_h = torch.reshape(cur_region_h, (num_points, num_points, cur_region_h.shape[-1]))
 
         # Compute velocities between gathered trajectory of grid and original grid values
         x_vel = cur_region_h[:, :, 0] - data_coords[:, :, 0]
@@ -375,10 +415,4 @@ def linear_flow_field(
         c = speed / speed.max()
         speeds.append(c)
 
-    jac_list = torch.stack(jac_list)
-    torch.save(jac_list, "jac_2.pt")
-    
     return data_coords_list, x_vels, y_vels, speeds
-
-def communication_subspace(src_region, trg_region):
-    pass
