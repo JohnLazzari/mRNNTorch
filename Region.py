@@ -106,15 +106,16 @@ class Region(nn.Module):
             connections_dict. Additionally, they won't be registered as parameters, so nothing will be 
             initialized in the mRNN class either. This should ensure everything is always zero.
         """
+
         if zero_connection:
             weight_mask *= zero_con_mask
             sign_matrix *= zero_con_mask
 
         # Store weight mask and sign matrix
         # Store trainable parameter
-        connection_properties["parameter"] = parameter
-        connection_properties["weight_mask"] = weight_mask.to(self.device)
-        connection_properties["sign_matrix"] = sign_matrix.to(self.device)
+        connection_properties["parameter"] = nn.Parameter(parameter) if not zero_connection else parameter
+        connection_properties["weight_mask"] = nn.Parameter(weight_mask, requires_grad=False) if not zero_connection else weight_mask
+        connection_properties["sign_matrix"] = nn.Parameter(sign_matrix, requires_grad=False) if not zero_connection else sign_matrix
         connection_properties["zero_connection"] = zero_connection
 
         # Add all of the properties to define the connection in Region class
@@ -124,9 +125,9 @@ class Region(nn.Module):
         if not zero_connection:
             # Register the main parameter denoting weights of model
             # Next, register the mask and sign matrix as parameters to ensure they're loaded in the same
-            self.register_parameter(dst_region_name, nn.Parameter(self.connections[dst_region_name]["parameter"]))
-            self.register_parameter(f"{dst_region_name}_weight_mask", nn.Parameter(self.connections[dst_region_name]["weight_mask"], requires_grad=False))
-            self.register_parameter(f"{dst_region_name}_sign_matrix", nn.Parameter(self.connections[dst_region_name]["sign_matrix"], requires_grad=False))
+            self.register_parameter(dst_region_name, self.connections[dst_region_name]["parameter"])
+            self.register_parameter(f"{dst_region_name}_weight_mask", self.connections[dst_region_name]["weight_mask"])
+            self.register_parameter(f"{dst_region_name}_sign_matrix", self.connections[dst_region_name]["sign_matrix"])
 
     def __generate_masks(self):
         """

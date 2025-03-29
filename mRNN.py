@@ -576,11 +576,11 @@ class mRNN(nn.Module):
         # List comprehension that gathers all information gathering weight subset
         global_weight_collection = [
             torch.cat([
-                        mrnn_weight[src_start_idx:src_end_idx, dst_start_idx:dst_end_idx]
-                        for dst_region in args
-                        for dst_start_idx, dst_end_idx in [region_indices[dst_region]]
+                mrnn_weight[src_start_idx:src_end_idx, dst_start_idx:dst_end_idx]
+                for dst_region in args
+                for dst_start_idx, dst_end_idx in [region_indices[dst_region]]
             ], dim=1)
-            for src_region, (src_start_idx, src_end_idx) in region_indices.items()
+            for _, (src_start_idx, src_end_idx) in region_indices.items()
         ]
 
         # Similar to before but now concatenating along rows
@@ -715,7 +715,7 @@ class mRNN(nn.Module):
         assert len(self.region_dict) > 0
         assert len(self.inp_dict) > 0
         
-        if inp.dim() < 3:
+        if inp.dim() != 3:
             raise Exception("input must be 3 dimensional, \
                             [batch, time, units] for batch_first=True, \
                             and [time, batch, units] otherwise].")
@@ -731,7 +731,7 @@ class mRNN(nn.Module):
         W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
         if self.constrained:
             W_inp = self.apply_dales_law(W_inp, W_inp_mask, W_inp_sign_matrix, self.lower_bound_inp, self.upper_bound_inp)
-        
+
         baseline_inp = self.get_tonic_inp()
         
         xn_next = x0
