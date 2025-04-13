@@ -697,7 +697,7 @@ class mRNN(nn.Module):
             xn[..., start_idx:end_idx] = self.region_dict[region].init
         return xn
 
-    def forward(self, x0, inp, *args, noise=True, h0=None):
+    def forward(self, inp, x0, *args, noise=True, h0=None):
         """
         Forward pass through the network.
         Implements discretized equation of the form: x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)
