@@ -151,20 +151,6 @@ def flow_field(
         _type_: _description_
     """
 
-    # Properly reshape trajectory if unbatched
-    if trajectory.dim() == 2:
-        if mrnn.batch_first:
-            trajectory = trajectory.unsqueeze(0)    
-        else:
-            trajectory = trajectory.unsqueeze(1)    
-
-    # Properly reshape input if unbatched
-    if inp.dim() == 2:
-        if mrnn.batch_first:
-            inp = inp.unsqueeze(0)    
-        else:
-            inp = inp.unsqueeze(1)    
-            
     # Get the correct batch and seq len
     if mrnn.batch_first:
         batch_size = trajectory.shape[0]
@@ -172,6 +158,9 @@ def flow_field(
     else:
         batch_size = trajectory.shape[1]
         seq_len = trajectory.shape[0]
+    
+    if region_list is None:
+        region_list = [region for region in mrnn.region_dict]
 
     # Lists for x and y velocities
     x_vels = []
@@ -190,7 +179,7 @@ def flow_field(
 
     # Gather activity for specified region and cell type
     temp_act_cur = [mrnn.get_region_activity(trajectory, region) for region in region_list]
-    temp_act = torch.cat(temp_region_acts, dim=-1)
+    temp_act = torch.cat(temp_act_cur, dim=-1)
 
     # Reshape activity before performing PCA
     temp_act = torch.reshape(temp_act, shape=(temp_act.shape[0] * temp_act.shape[1], temp_act.shape[2])) 
@@ -267,9 +256,10 @@ def flow_field(
             if stim_input is not None:
                 stim_input_t = stim_input[:, t:t+1, :]
             else:
-                stim_input_t = torch.zeros_like(inp_t)
-
-            _, h = mrnn(x_0_flow[:, t, :], inp_t, stim_input_t, noise=False)
+                stim_input_t = torch.zeros_like(x_0_flow)
+            
+            # Make sure that h0 is the same as x_0 and that an activation is not applied, this causes issues
+            _, h = mrnn(inp_t, x_0_flow[:, t, :], x_0_flow[:, t, :], stim_input_t[:, t:t+1, :], noise=False)
 
         # Get activity for regions of interest
         temp_region_acts = [mrnn.get_region_activity(h, region) for region in region_list]
