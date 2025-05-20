@@ -697,7 +697,7 @@ class mRNN(nn.Module):
             xn[..., start_idx:end_idx] = self.region_dict[region].init
         return xn
 
-    def forward(self, x0, inp, *args, noise=True, h0=None):
+    def forward(self, inp, x0, h0, *args, noise=True):
         """
         Forward pass through the network.
         Implements discretized equation of the form: x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)
@@ -735,7 +735,7 @@ class mRNN(nn.Module):
         baseline_inp = self.get_tonic_inp()
         
         xn_next = x0
-        hn_next = self.activation(x0.clone()) if h0 is None else h0
+        hn_next = h0
 
         # Create lists for xs and hns
         new_hs = []
