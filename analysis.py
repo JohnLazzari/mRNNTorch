@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import json
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-from torch.autograd.functional import jacobian
 
 def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
     """ Find jacobian of network Taylor series expansion
@@ -44,15 +43,15 @@ def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
 
     # Implementing h'(x), diagonalize to multiply by W
     if mrnn.activation_name == "relu":
-        d_x_act_diag = jacobian(F.relu, x_sub)
+        d_x_act_diag = torch.autograd.functional.jacobian(F.relu, x_sub)
     elif mrnn.activation_name == "linear":
-        d_x_act_diag = jacobian(linear, x_sub)
+        d_x_act_diag = torch.autograd.functional.jacobian(linear, x_sub)
     elif mrnn.activation_name == "tanh":
-        d_x_act_diag = jacobian(F.tanh, x_sub)
+        d_x_act_diag = torch.autograd.functional.jacobian(F.tanh, x_sub)
     elif mrnn.activation_name == "sigmoid":
-        d_x_act_diag = jacobian(F.sigmoid, x_sub)
+        d_x_act_diag = torch.autograd.functional.jacobian(F.sigmoid, x_sub)
     elif mrnn.activation_name == "softplus":
-        d_x_act_diag = jacobian(F.softplus, x_sub)
+        d_x_act_diag = torch.autograd.functional.jacobian(F.softplus, x_sub)
     else:
         raise ValueError("not a valid activation function")
 
@@ -129,7 +128,8 @@ def flow_field(
     y_offset=1,
     region_list=None,
     stim_input=None,
-    cancel_other_regions=False
+    cancel_other_regions=False,
+    follow_traj=True
 ):
     """ Generate flow fields and energy landscapes of mRNN activity
         Allows for specifying certain subregions to obtain velocities for
@@ -190,7 +190,7 @@ def flow_field(
 
     # Gather activity for specified region and cell type
     temp_act_cur = [mrnn.get_region_activity(trajectory, region) for region in region_list]
-    temp_act = torch.cat(temp_region_acts, dim=-1)
+    temp_act = torch.cat(temp_act_cur, dim=-1)
 
     # Reshape activity before performing PCA
     temp_act = torch.reshape(temp_act, shape=(temp_act.shape[0] * temp_act.shape[1], temp_act.shape[2])) 
@@ -200,6 +200,11 @@ def flow_field(
     x_pca.fit(temp_act)
     reduced_traj = x_pca.fit_transform(temp_act)
 
+    lower_bound_x = -x_offset
+    upper_bound_x = x_offset
+    lower_bound_y = -y_offset
+    upper_bound_y = y_offset
+
     # Now going through trajectory
     for t in tqdm(range(1, seq_len, time_skips)):
 
@@ -207,10 +212,11 @@ def flow_field(
         # To do so, find where the last timestep is in pc space and center a grid around that
         latest_t = reduced_traj[t, :]
 
-        lower_bound_x = np.round(latest_t[0] - x_offset, decimals=1)
-        upper_bound_x = np.round(latest_t[0] + x_offset, decimals=1)
-        lower_bound_y = np.round(latest_t[1] - y_offset, decimals=1)
-        upper_bound_y = np.round(latest_t[1] + y_offset, decimals=1)
+        if follow_traj:
+            lower_bound_x = np.round(latest_t[0] - x_offset, decimals=1)
+            upper_bound_x = np.round(latest_t[0] + x_offset, decimals=1)
+            lower_bound_y = np.round(latest_t[1] - y_offset, decimals=1)
+            upper_bound_y = np.round(latest_t[1] + y_offset, decimals=1)
 
         # Num points is along each axis, not in total
         x = np.linspace(lower_bound_x, upper_bound_x, num_points)
@@ -238,12 +244,6 @@ def flow_field(
         grid_region_idx = 0
         x_0_flow = []
 
-        # Precompute non-grid region activities (if cancel_other_regions is True)
-        non_grid_region_activities = {
-            region: torch.zeros_like(mrnn.get_region_activity(full_act_batch, region)) 
-            for region in mrnn.region_dict if region not in region_list and cancel_other_regions
-        }
-
         # In order to get next step activity for grid, each region not being represented
         # By the grid will assume their values from the original trajectory passed in at 
         # Each timestep. Here we will gather activity for the grid and properly append the 
@@ -254,7 +254,10 @@ def flow_field(
                 grid_region_idx += mrnn.region_dict[region].num_units
             else:
                 # Get activity for non-specified regions (either from cache or compute)
-                region_activity = non_grid_region_activities.get(region) or mrnn.get_region_activity(full_act_batch, region)
+                if cancel_other_regions:
+                    region_activity = torch.zeros_like(mrnn.get_region_activity(full_act_batch, region))
+                else:
+                    region_activity = mrnn.get_region_activity(full_act_batch, region)
                 x_0_flow.append(region_activity)
         # Finalize the concatenation
         x_0_flow = torch.cat(x_0_flow, dim=-1)
