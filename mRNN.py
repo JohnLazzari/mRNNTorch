@@ -476,7 +476,8 @@ class mRNN(nn.Module):
         """
         if lower_bound < 0:
             raise ValueError("Lower bounds below zero not allowed for Dale's Law")
-        return W_rec_mask * F.hardtanh(W_rec, lower_bound, upper_bound) * W_rec_sign_matrix
+        # TODO changed this to absolute value for now!!!!!!!!!!!!!!!
+        return W_rec_mask * torch.abs(W_rec) * W_rec_sign_matrix
 
     def get_tonic_inp(self):
         """
