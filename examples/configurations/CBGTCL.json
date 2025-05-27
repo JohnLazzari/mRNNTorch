@@ -2,143 +2,212 @@
 
     "__comment_regions": [
         "Structure of regions key:",
-        "{",
+        "[",
         "name: str",
         "num_units: int",
         "base_firing: float",
-        "init: float",
-        "parent_region: string",
-        "learnable_bias: bool",
-        "}"
+        "]"
+
     ],
 
     "recurrent_regions": [
       {
-        "name": "striatum",
-        "num_units": 100
+        "name": "d1",
+        "num_units": 50,
+        "base_firing": 0,
+        "sign": "neg"
+      },
+      {
+        "name": "d2",
+        "num_units": 50,
+        "base_firing": 0,
+        "sign": "neg"
       },
       {
         "name": "gpe",
-        "num_units": 50
+        "num_units": 50,
+        "base_firing": 1,
+        "init": 1,
+        "sign": "neg"
       },
       {
         "name": "stn",
-        "num_units": 50
+        "num_units": 50,
+        "base_firing": 1,
+        "init": 0,
+        "sign": "pos"
       },
       {
         "name": "snr",
-        "num_units": 50
+        "num_units": 50,
+        "base_firing": 1,
+        "init": 1,
+        "sign": "neg"
       },
       {
         "name": "thal",
-        "num_units": 50
+        "num_units": 50,
+        "base_firing": 1,
+        "sign": "pos"
       },
       {
-        "name": "alm",
-        "num_units": 50
+        "name": "alm_exc",
+        "num_units": 40,
+        "base_firing": 0,
+        "sign": "pos"
+      },
+      {
+        "name": "alm_inhib",
+        "num_units": 10,
+        "base_firing": 0,
+        "sign": "neg"
       }
     ],
 
     "__comment_connections": [
         "Structure of connections key:",
-        "{",
+        "[",
         "src_region: str",
         "dst_region: str",
         "sign: str (exc or inhib)",
         "sparsity: float (between 0 and 1)",
-        "}"
+        "]"
     ],
 
     "recurrent_connections": [
       {
-        "src_region": "striatum",
-        "dst_region": "striatum",
-        "sign": "inhib",
-        "sparsity": 0.7
+        "src_region": "d1",
+        "dst_region": "d1",
+        "sparsity": 0.9
       },
       {
-        "src_region": "striatum",
+        "src_region": "d1",
+        "dst_region": "d2",
+        "sparsity": 0.9
+      },
+      {
+        "src_region": "d2",
+        "dst_region": "d1",
+        "sparsity": 0.9
+      },
+      {
+        "src_region": "d2",
+        "dst_region": "d2",
+        "sparsity": 0.9
+      },
+      {
+        "src_region": "d2",
         "dst_region": "gpe",
-        "sign": "inhib"
+        "sparsity": 0.25
       },
       {
-        "src_region": "striatum",
+        "src_region": "d1",
         "dst_region": "snr",
-        "sign": "inhib"
+        "sparsity": 0.25
       },
       {
         "src_region": "gpe",
         "dst_region": "stn",
-        "sign": "inhib"
+        "sparsity": 0.25
       },
       {
         "src_region": "stn",
         "dst_region": "snr",
-        "sign": "exc"
+        "sparsity": 0.25
       },
       {
         "src_region": "snr",
         "dst_region": "thal",
-        "sign": "inhib"
+        "sparsity": 0.25
       },
       {
         "src_region": "thal",
-        "dst_region": "striatum",
-        "sign": "exc"
+        "dst_region": "d1",
+        "sparsity": 0.25
       },
       {
         "src_region": "thal",
-        "dst_region": "alm",
-        "sign": "exc"
+        "dst_region": "d2",
+        "sparsity": 0.25
       },
       {
-        "src_region": "alm",
-        "dst_region": "alm",
-        "sign": "exc"
+        "src_region": "thal",
+        "dst_region": "alm_exc",
+        "sparsity": 0.25
       },
       {
-        "src_region": "alm",
-        "dst_region": "alm",
-        "sign": "inhib"
+        "src_region": "thal",
+        "dst_region": "alm_inhib",
+        "sparsity": 0.25
       },
       {
-        "src_region": "alm",
-        "dst_region": "striatum",
-        "sign": "exc"
+        "src_region": "alm_exc",
+        "dst_region": "alm_exc",
+        "sparsity": 0.25
+      },
+      {
+        "src_region": "alm_exc",
+        "dst_region": "alm_inhib",
+        "sparsity": 0.25
+      },
+      {
+        "src_region": "alm_inhib",
+        "dst_region": "alm_inhib",
+        "sparsity": 0.25
+      },
+      {
+        "src_region": "alm_inhib",
+        "dst_region": "alm_exc",
+        "sparsity": 0.25
+      },
+      {
+        "src_region": "alm_exc",
+        "dst_region": "d1",
+        "sparsity": 0.25
+      },
+      {
+        "src_region": "alm_exc",
+        "dst_region": "d2",
+        "sparsity": 0.25
       }
     ],
 
     "__comment_input_regions": [
         "Structure of input_regions key:",
-        "{",
+        "[",
         "name: str",
         "num_units: int",
-        "}"
+        "]"
     ],
 
     "input_regions": [
       {
-        "num_units": 1,
-        "name": "iti"
+        "num_units": 25,
+        "name": "iti",
+        "sign": "pos"
       }
     ],
 
     "__comment_input_connections": [
         "Structure of input_connections key:",
-        "{",
+        "[",
         "src_region: str (must be a recurrent region!)",
         "dst_region: str",
         "sparsity: float",
         "sign: str",
-        "}"
+        "]"
     ],
 
     "input_connections": [
       {
-        "input": "iti",
-        "dst_region": "striatum",
-        "sign": "exc",
-        "sparsity": 0.5
+        "src_region": "iti",
+        "dst_region": "d1",
+        "sparsity": 0.25
+      },
+      {
+        "src_region": "iti",
+        "dst_region": "d2",
+        "sparsity": 0.25
       }
     ]
   }
