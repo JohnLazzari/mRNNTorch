@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="c" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5b8def"/>
+      <stop offset="100%" stop-color="#7bd389"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="300" fill="url(#bg)"/>
+  <g opacity="0.2">
+    <circle cx="150" cy="150" r="100" fill="url(#c)"/>
+    <circle cx="350" cy="120" r="80" fill="url(#c)"/>
+    <circle cx="550" cy="180" r="90" fill="url(#c)"/>
+    <circle cx="780" cy="140" r="110" fill="url(#c)"/>
+    <circle cx="1000" cy="170" r="85" fill="url(#c)"/>
+  </g>
+  <text x="600" y="170" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="44" fill="#cfe8ff">
+    Multi-Regional Recurrent Neural Networks in PyTorch
+  </text>
+</svg>
+

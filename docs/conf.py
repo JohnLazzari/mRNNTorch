@@ -16,6 +16,8 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "myst_parser",
+    "sphinx_copybutton",
+    "sphinx_design",
 ]
 
 # Mock heavy deps so autodoc works on Read the Docs
@@ -52,8 +54,14 @@ myst_enable_extensions = [
 
 # -- Options for HTML output -------------------------------------------------
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
+html_title = "mRNNTorch"
 html_static_path = ["_static"]
+html_logo = "_static/logo.svg"
+html_favicon = "_static/favicon.svg"
+html_css_files = [
+    "css/custom.css",
+]
 
 # -- Autodoc options ---------------------------------------------------------
 

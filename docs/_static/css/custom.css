@@ -1,0 +1,40 @@
+:root {
+  --brand-primary: #5b8def;
+  --brand-accent: #7bd389;
+  --brand-deep: #334155;
+}
+
+/* Furo variables (light) */
+[data-theme="light"] {
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-content: var(--brand-primary);
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f8fafc;
+}
+
+/* Furo variables (dark) */
+[data-theme="dark"] {
+  --color-brand-primary: var(--brand-accent);
+  --color-brand-content: var(--brand-accent);
+  --color-background-primary: #0b1220;
+  --color-background-secondary: #111827;
+}
+
+/* Hero image spacing */
+.hero {
+  display: block;
+  margin: 0 auto 1rem auto;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+/* Make code blocks pop a bit */
+.highlight pre, pre { border-radius: 8px; }
+
+/* Card tweaks (sphinx-design) */
+.sd-card .sd-card-header { font-weight: 600; }
+.sd-card { border-radius: 10px; }
+
+/* Navbar logo sizing */
+.sidebar-logo img { height: 40px; }
+
