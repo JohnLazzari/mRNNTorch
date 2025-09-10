@@ -1,3 +1,9 @@
+"""Region definitions for mRNN.
+
+Provides base :class:`Region` and concrete :class:`RecurrentRegion` and
+:class:`InputRegion` containers that own connection parameters and masks.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,26 +16,28 @@ import json
 
 class Region(nn.Module):
     """
-    A class representing a region in a neural network that models connections 
-    to other regions along with other properties such as cell types and firing rates.
-    
+    Base class for regions used by mRNN.
+
+    Models outgoing connections to other regions along with simple region
+    properties. Each region maintains its own connection parameters and masks
+    (including sign masks enforcing Dale's Law when used by mRNN).
+
     Attributes:
-        num_units (int): Number of neurons in the region.
-        base_firing (torch.Tensor): Baseline firing rate for each neuron in the region.
-        device (torch.device): The device on which to store the tensors (e.g., 'cpu' or 'cuda').
-        cell_type_info (dict): Dictionary specifying each cell type and the proportion of neurons each type occupies.
-        connections (dict): Dictionary to store the connections to other regions.
-        masks (dict): Masks for each cell type and region properties (e.g., full mask, zero mask).
+        num_units (int): Number of units in the region.
+        sign (str): "pos" for excitatory or "neg" for inhibitory outputs.
+        device (str): Torch device string for tensors.
+        connections (dict): Mapping of destination region name -> dict with
+            keys {"parameter", "weight_mask", "sign_matrix", "zero_connection"}.
+        masks (dict): Convenience masks including "ones" and "zeros" of length ``num_units``.
     """
     
     def __init__(self, num_units, sign="pos", device="cuda"):
-        """
-        Initializes the Region class.
-        
+        """Construct a region.
+
         Args:
-            num_units (int): Number of neurons in the region.
-            sign (str): sign of weights, should be None, exc, or inhib
-            device (torch.device): The device ('cpu' or 'cuda').
+            num_units (int): Number of units in this region.
+            sign (str): "pos" for excitatory or "neg" for inhibitory outputs.
+            device (str): Torch device string (e.g., "cpu" or "cuda").
         """
         super(Region, self).__init__()
 
@@ -48,15 +56,18 @@ class Region(nn.Module):
         sparsity,
         zero_connection=False, 
     ):
-        """
-        Adds a connection from the current region to a specified projection region.
-        
+        """Add a connection from this region to ``dst_region``.
+
+        Creates a trainable weight parameter and associated non-trainable masks.
+        If ``sparsity`` is provided, a binary mask is sampled to achieve the
+        requested sparsity.
+
         Args:
-            dst_region_name (str):                  Name of the region that the current region connects to.
-            dst_region (Region):                    The target region to which the connection is made.
-            sign (str):                             Specifies if the connection is excitatory or inhibitory ('inhib' for inhibitory).
-            sparsity (float):                       Specifies how sparse the connections are (defualts to none otherwise)
-            zero_connection (bool, optional):       If True, no connections are created (default is False).
+            dst_region_name (str): Name of the destination region.
+            dst_region (Region): Destination region object.
+            sparsity (float | None): Fraction of nonzero connections (0-1).
+            zero_connection (bool): If True, registers a fixed zero connection
+                (no trainable parameters are created for this edge).
         """
 
         """
@@ -130,9 +141,7 @@ class Region(nn.Module):
             self.register_parameter(f"{dst_region_name}_sign_matrix", self.connections[dst_region_name]["sign_matrix"])
 
     def __generate_masks(self):
-        """
-        Generates masks for the region, including full and zero masks, and specific cell-type masks.
-        """
+        """Generate reusable full and zero masks for this region."""
         full_mask = torch.ones(size=(self.num_units,)).to(self.device)
         zero_mask = torch.zeros(size=(self.num_units,)).to(self.device)
 
@@ -140,6 +149,7 @@ class Region(nn.Module):
         self.masks["zeros"] = zero_mask
 
     def __assert_projection_type(self, dst_region):
+        """Ensure that projections only target recurrent regions."""
         assert isinstance(dst_region, RecurrentRegion)
 
     def has_connection_to(self, region):
@@ -162,15 +172,16 @@ class Region(nn.Module):
 class RecurrentRegion(Region):
     def __init__(self, num_units, base_firing, init, sign="pos", device="cuda", parent_region=None, learnable_bias=False):
         super(RecurrentRegion, self).__init__(num_units, sign=sign, device=device)
-        """ Recurrent Region Class (mostly inherits from base Region class)
-        
-            Params:
-                num_units:
-                base_firing:
-                init:
-                device:
-                parent_region:
-                learnable_bias:
+        """Recurrent region (inherits from :class:`Region`).
+
+        Args:
+            num_units (int): Number of units in the region.
+            base_firing (float): Baseline firing for each unit.
+            init (float): Initial pre-activation value for units.
+            sign (str): "pos" or "neg" indicating excitatory/inhibitory outputs.
+            device (str): Torch device string.
+            parent_region (str | None): Optional parent identifier.
+            learnable_bias (bool): If True, make ``base_firing`` a trainable parameter.
         """
 
         self.init = init * torch.ones(size=(self.num_units,))
@@ -191,3 +202,10 @@ class InputRegion(Region):
     def __init__(self, num_units, sign="pos", device="cuda"):
         # Implements base region class
         super(InputRegion, self).__init__(num_units, sign=sign, device=device)
+        """Input region (inherits from :class:`Region`).
+
+        Args:
+            num_units (int): Number of input channels.
+            sign (str): "pos" or "neg" indicating sign mask for inputs.
+            device (str): Torch device string.
+        """

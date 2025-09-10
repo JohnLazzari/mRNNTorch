@@ -1,3 +1,9 @@
+"""Analysis utilities for mRNN dynamics and structure.
+
+Includes linearization, eigen analyses, PSTH-like summaries, and flow fields
+to visualize local dynamics in low-dimensional subspaces.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,16 +17,25 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
-    """ Find jacobian of network Taylor series expansion
+    """Linearize the dynamics around a state and return the Jacobian.
+
+    Computes the Jacobian of the mRNN update with respect to the hidden state
+    evaluated at the provided state ``x`` and (optionally) a subset of regions
+    defined by ``*args``. If ``W_inp`` is provided, also returns the Jacobian
+    with respect to the input.
 
     Args:
-        mrnn (_type_): _description_
-        x (_type_): _description_
-        start_region (_type_): _description_
-        end_region (_type_): _description_
+        mrnn (mRNN): An initialized mRNN instance.
+        x (torch.Tensor): 1D tensor representing the hidden state at which to
+            linearize (shape ``[H]``).
+        *args (str): Optional region names specifying a subset for the Jacobian.
+        W_inp (torch.Tensor | None): Optional input weight matrix to include in
+            the input Jacobian.
+        alpha (float): Discretization factor used in the update.
 
     Returns:
-        _type_: _description_
+        torch.Tensor | tuple[torch.Tensor, torch.Tensor]: Jacobian w.r.t. hidden
+        state, and optionally (Jacobian w.r.t. input) if ``W_inp`` is provided.
     """
     assert x.dim() == 1
     # Get the subset of the weights required for jacobian 
@@ -67,20 +82,18 @@ def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
     return jacobian
 
 def linearized_eigendecomposition(mrnn, x, *args, alpha=1):
-    """Linearize the network and compute eigenvalues at each timestep
+    """Linearize the network and compute eigen decomposition.
 
     Args:
-        mrnn (mRNN): mRNN instance
-        x (Torch.Tensor): 
-        start_region (str, optional): Beginning of subset of weights to compute jacobian of. Defaults to None.
-        end_region (str, optional): End of subset of weights to compute jacobian of. Defaults to None.
-        start_cell_type (str, optional): Specify cell type for start region. Defaults to None.
-        end_cell_type (str, optional): Specify cell type for end region. Defaults to None.
+        mrnn (mRNN): mRNN instance.
+        x (torch.Tensor): 1D hidden state where the system is linearized.
+        *args (str): Optional subset of regions to consider.
+        alpha (float): Discretization factor.
 
     Returns:
-        list: Real eigenvalues
-        list: Imaginary eigenvalues
-        np.array: eigenvectors
+        list[float]: Real parts of eigenvalues.
+        list[float]: Imag parts of eigenvalues.
+        torch.Tensor: Eigenvectors stacked column-wise.
     """
     jacobian = linearize_trajectory(mrnn, x, *args, alpha=alpha)
     eigenvalues, eigenvectors = torch.linalg.eig(jacobian)
@@ -98,14 +111,18 @@ def linearized_eigendecomposition(mrnn, x, *args, alpha=1):
 
 
 def psth(mrnn, act, *args, average=True):
-    """Gather the PSTH for each region in the network
+    """Compute per-region activity traces (PSTH-style).
 
     Args:
-        rnn (mRNN): mRNN instance
-        act (Torch.Tensor): Tensor of mRNN activity during a trial
+        mrnn (mRNN): mRNN instance.
+        act (torch.Tensor): Activity tensor of shape ``[B, T, H]`` or ``[T, B, H]``
+            depending on ``mrnn.batch_first``.
+        *args (str): Region names to extract.
+        average (bool): If True, average across time axis; otherwise return the
+            full traces per region.
 
     Returns:
-        Dictionary: Contains average activity for each individual region
+        list[torch.Tensor]: One tensor per region in ``args``.
     """
         
     activity_list = []
@@ -131,24 +148,28 @@ def flow_field(
     cancel_other_regions=False,
     follow_traj=True
 ):
-    """ Generate flow fields and energy landscapes of mRNN activity
-        Allows for specifying certain subregions to obtain velocities for
-        Regions that are not being tested will assume their control activity for given input while gathering specified regional velocities
+    """Compute 2D flow fields in a region subspace along a trajectory.
+
+    Projects selected region activity onto a 2D PCA subspace, constructs a grid
+    around the current point, and advances the system by one step to estimate
+    the local flow (velocity vectors). Can zero out non-selected regions or
+    keep their control values.
 
     Args:
-        mrnn (mRNN): _description_
-        trajectory (Torch.Tensor): _description_
-        input (Torch.Tensor): _description_
-        time_skips (int): _description_
-        num_points (int): _description_
-        lower_bound_x (int): _description_
-        upper_bound_x (int): _description_
-        lower_bound_y (int): _description_
-        upper_bound_y (int): _description_
-        region_cell_type_list (list): 
+        mrnn (mRNN): mRNN instance.
+        trajectory (torch.Tensor): Hidden activations over time.
+        inp (torch.Tensor): External input sequence.
+        time_skips (int): Step size when sampling along the trajectory.
+        num_points (int): Number of points per axis in the grid.
+        x_offset (float): Half-width of the grid in PC1.
+        y_offset (float): Half-width of the grid in PC2.
+        region_list (list[str] | None): Regions to include in the 2D subspace.
+        stim_input (torch.Tensor | None): Optional additive stimulus input.
+        cancel_other_regions (bool): If True, zero non-selected regions.
+        follow_traj (bool): If True, center each grid on the current trajectory point.
 
     Returns:
-        _type_: _description_
+        tuple: (coords_per_t, x_vels, y_vels, speeds) lists per sampled time.
     """
 
     # Get the correct batch and seq len
@@ -300,26 +321,24 @@ def linear_flow_field(
     region_list=None,
     alpha=1
 ):
-    """ Generate flow fields and energy landscapes of mRNN activity
-        Allows for specifying certain subregions to obtain velocities for
-        Regions that are not being tested will assume their control activity for given input while gathering specified regional velocities
-        This function currently assumes no external input to the selected regions
-        The flow field will represent the dynamics of the selected regions in isolation
+    """Compute linearized flow fields in a 2D subspace.
+
+    Similar to :func:`flow_field`, but uses a local linear approximation (Jacobian)
+    of the dynamics around points on the trajectory instead of a full forward
+    step. Assumes no external input to the selected regions.
 
     Args:
-        mrnn (mRNN): _description_
-        trajectory (Torch.Tensor): _description_
-        input (Torch.Tensor): _description_
-        time_skips (int): _description_
-        num_points (int): _description_
-        lower_bound_x (int): _description_
-        upper_bound_x (int): _description_
-        lower_bound_y (int): _description_
-        upper_bound_y (int): _description_
-        region_cell_type_list (list): 
+        mrnn (mRNN): mRNN instance.
+        trajectory (torch.Tensor): Hidden activations over time for selected regions.
+        time_skips (int): Step size when sampling along the trajectory.
+        num_points (int): Number of points per axis in the grid.
+        x_offset (float): Half-width of the grid in PC1.
+        y_offset (float): Half-width of the grid in PC2.
+        region_list (list[str]): Regions to include in the 2D subspace.
+        alpha (float): Discretization factor used in linearization.
 
     Returns:
-        _type_: _description_
+        tuple: (coords_per_t, x_vels, y_vels, speeds) lists per sampled time.
     """
 
     # Assuming batch_first=True for now
