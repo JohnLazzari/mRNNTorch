@@ -525,6 +525,14 @@ class mRNN(nn.Module):
         """
         for name, region in self.inp_dict.items():
             yield prefix + name, region
+    
+    def get_region_size(self, region):
+        """ Get the nubmer of units in a region
+
+        Args:
+            region (str): region to get size of
+        """
+        return self.region_dict[region].num_units if region in self.region_dict else self.inp_dict[region].num_units
 
     def get_region_activity(self, act, *args):
         """
@@ -718,7 +726,7 @@ class mRNN(nn.Module):
             xn[..., start_idx:end_idx] = self.region_dict[region].init
         return xn
 
-    def forward(self, inp, x0, h0, *args, noise=True):
+    def forward(self, inp, x0, h0, *args, noise=True, W_rec=None, W_inp=None):
         """Run the recurrent dynamics over a sequence.
 
         Discretized update: ``x_{t+1} = x_t + alpha * (-x_t + W_rec h_t + W_inp u_t + b + noise)``
@@ -747,15 +755,26 @@ class mRNN(nn.Module):
         if x0.dim() != 2:
             raise Exception("x0 must be 2 dimensional, [batch, units].")
 
-        # Apply Dale's Law if constrained
-        W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
-        if self.constrained:
-            W_rec = self.apply_dales_law(W_rec, W_rec_mask, W_rec_sign_matrix, self.lower_bound_rec, self.upper_bound_rec)
+        if W_rec is None:
+            # Apply Dale's Law if constrained
+            W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
+            if self.constrained:
+                W_rec = self.apply_dales_law(W_rec, W_rec_mask, W_rec_sign_matrix, self.lower_bound_rec, self.upper_bound_rec)
+        else:
+            # Ensure provided W_rec is on correct device and dtype
+            W_rec = W_rec.to(self.device)
+            if W_rec.dtype != x0.dtype:
+                W_rec = W_rec.to(x0.dtype)
         
-        # Apply to input weights as well
-        W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
-        if self.constrained:
-            W_inp = self.apply_dales_law(W_inp, W_inp_mask, W_inp_sign_matrix, self.lower_bound_inp, self.upper_bound_inp)
+        if W_inp is None:
+            # Apply to input weights as well
+            W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
+            if self.constrained:
+                W_inp = self.apply_dales_law(W_inp, W_inp_mask, W_inp_sign_matrix, self.lower_bound_inp, self.upper_bound_inp)
+        else:
+            W_inp = W_inp.to(self.device)
+            if W_inp.dtype != x0.dtype:
+                W_inp = W_inp.to(x0.dtype)
 
         baseline_inp = self.get_tonic_inp()
         

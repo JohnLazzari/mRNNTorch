@@ -139,7 +139,7 @@ def flow_field(
     mrnn, 
     trajectory,
     inp,
-    time_skips=1, 
+    *args,
     num_points=50,
     x_offset=1,
     y_offset=1,
@@ -180,8 +180,10 @@ def flow_field(
         batch_size = trajectory.shape[1]
         seq_len = trajectory.shape[0]
     
-    if region_list is None:
+    if not args:
         region_list = [region for region in mrnn.region_dict]
+    else:
+        region_list = [region for region in args]
 
     # Lists for x and y velocities
     x_vels = []
@@ -216,7 +218,7 @@ def flow_field(
     upper_bound_y = y_offset
 
     # Now going through trajectory
-    for t in tqdm(range(1, seq_len, time_skips)):
+    for t in tqdm(range(seq_len)):
 
         # We want to find the best grid
         # To do so, find where the last timestep is in pc space and center a grid around that
