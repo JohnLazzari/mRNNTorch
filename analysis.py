@@ -16,7 +16,7 @@ import json
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 
-def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
+def linearize_trajectory(mrnn, x, *args, W_inp=None, W_rec=None, alpha=1):
     """Linearize the dynamics around a state and return the Jacobian.
 
     Computes the Jacobian of the mRNN update with respect to the hidden state
@@ -38,8 +38,13 @@ def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
         state, and optionally (Jacobian w.r.t. input) if ``W_inp`` is provided.
     """
     assert x.dim() == 1
-    # Get the subset of the weights required for jacobian 
-    weight_subset = mrnn.get_weight_subset(*args)
+    
+    if W_rec == None:
+        # Get the subset of the weights required for jacobian 
+        weight_subset = mrnn.get_weight_subset(*args)
+    else:
+        weight_subset = W_rec
+
     # linearize the dynamics about state
     x_sub = mrnn.get_region_activity(x, *args) 
 
@@ -81,7 +86,7 @@ def linearize_trajectory(mrnn, x, *args, W_inp=None, alpha=1):
     
     return jacobian
 
-def linearized_eigendecomposition(mrnn, x, *args, alpha=1):
+def linearized_eigendecomposition(mrnn, x, *args, W_inp=None, W_rec=None, alpha=1):
     """Linearize the network and compute eigen decomposition.
 
     Args:
@@ -95,7 +100,7 @@ def linearized_eigendecomposition(mrnn, x, *args, alpha=1):
         list[float]: Imag parts of eigenvalues.
         torch.Tensor: Eigenvectors stacked column-wise.
     """
-    jacobian = linearize_trajectory(mrnn, x, *args, alpha=alpha)
+    jacobian = linearize_trajectory(mrnn, x, *args, W_inp=W_inp, W_rec=W_rec, alpha=alpha)
     eigenvalues, eigenvectors = torch.linalg.eig(jacobian)
     
     # Split real and imaginary parts
