@@ -58,9 +58,6 @@ def linearize_trajectory(mrnn, x, *args, W_inp=None, W_rec=None, alpha=1):
     def linear(x):
         return x
 
-    # Identity representing -x in state equation
-    I = torch.eye(n=x_sub.shape[0], device=mrnn.device)
-
     # Implementing h'(x), diagonalize to multiply by W
     if mrnn.activation_name == "relu":
         d_x_act_diag = torch.autograd.functional.jacobian(F.relu, x_sub)
@@ -76,12 +73,12 @@ def linearize_trajectory(mrnn, x, *args, W_inp=None, W_rec=None, alpha=1):
         raise ValueError("not a valid activation function")
 
     # Get final jacobian using form above
-    jacobian = (I - alpha * I) + alpha * (d_x_act_diag @ weight_subset)
+    jacobian = alpha * (d_x_act_diag @ weight_subset)
 
     # If an input weight is specified
     if W_inp != None:
-        # No need for identity in this case
-        jacobian_inp = alpha * W_inp
+        # Get final jacobian using form above
+        jacobian_inp = alpha * (d_x_act_diag @ W_inp)
         return jacobian, jacobian_inp
     
     return jacobian
