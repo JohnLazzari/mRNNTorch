@@ -90,7 +90,8 @@ class mRNN(nn.Module):
         activation="relu",
         noise_level_act=0.01, 
         noise_level_inp=0.01, 
-        constrained=True, 
+        rec_constrained=True, 
+        inp_constrained=True, 
         dt=10,
         tau=100,
         batch_first=True,
@@ -108,7 +109,8 @@ class mRNN(nn.Module):
         self.region_dict = {}
         self.inp_dict = {}
         self.region_mask_dict = {}
-        self.constrained = constrained
+        self.rec_constrained = rec_constrained
+        self.inp_constrained = inp_constrained
         self.device = device
         self.dt = dt
         self.tau = tau
@@ -338,7 +340,7 @@ class mRNN(nn.Module):
         for name, param in self.region_dict[src_region].named_parameters():
             if name == dst_region:
                 # Default initialization for recurrent weights
-                self.__constrained_default_init_rec(param) if self.constrained else nn.init.xavier_normal_(param)
+                self.__constrained_default_init_rec(param) if self.rec_constrained else nn.init.xavier_normal_(param)
                 # Register parameter manually
                 self.register_parameter(param_name, param)
             elif name == f"{dst_region}_weight_mask":
@@ -372,7 +374,7 @@ class mRNN(nn.Module):
         for name, param in self.inp_dict[src_region].named_parameters():
             if name == dst_region:
                 # Default initialization for inputs
-                self.__constrained_default_init_inp(param) if self.constrained else nn.init.xavier_normal_(param)
+                self.__constrained_default_init_inp(param) if self.inp_constrained else nn.init.xavier_normal_(param)
                 # Manually register parameter
                 self.register_parameter(param_name, param)
             elif name == f"{dst_region}_weight_mask":
@@ -758,7 +760,7 @@ class mRNN(nn.Module):
         if W_rec is None:
             # Apply Dale's Law if constrained
             W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
-            if self.constrained:
+            if self.rec_constrained:
                 W_rec = self.apply_dales_law(W_rec, W_rec_mask, W_rec_sign_matrix, self.lower_bound_rec, self.upper_bound_rec)
         else:
             # Ensure provided W_rec is on correct device and dtype
@@ -769,7 +771,7 @@ class mRNN(nn.Module):
         if W_inp is None:
             # Apply to input weights as well
             W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
-            if self.constrained:
+            if self.inp_constrained:
                 W_inp = self.apply_dales_law(W_inp, W_inp_mask, W_inp_sign_matrix, self.lower_bound_inp, self.upper_bound_inp)
         else:
             W_inp = W_inp.to(self.device)
