@@ -392,7 +392,7 @@ class mRNN(nn.Module):
         """
         # Get weight matrix
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
-        if self.constrained:
+        if self.rec_constrained:
             W_rec = self.apply_dales_law(
                 W_rec, 
                 W_rec_mask, 
