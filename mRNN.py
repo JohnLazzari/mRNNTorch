@@ -587,7 +587,7 @@ class mRNN(nn.Module):
         # Gather original weight matrix and apply Dale's Law if constrained
         # Can only be recurrent if not using to and from
         mrnn_weight, W_rec_mask, W_rec_sign = self.gen_w(self.region_dict)
-        if self.constrained == True:
+        if self.rec_constrained == True:
             mrnn_weight = self.apply_dales_law(mrnn_weight, W_rec_mask, W_rec_sign)
         
         # Default to standard weight matrix if no regions are provided

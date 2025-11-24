@@ -273,6 +273,7 @@ def flow_field(
                 else:
                     region_activity = mrnn.get_region_activity(full_act_batch, region)
                 x_0_flow.append(region_activity)
+
         # Finalize the concatenation
         x_0_flow = torch.cat(x_0_flow, dim=-1)
 
