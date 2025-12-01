@@ -124,21 +124,13 @@ class Region(nn.Module):
 
         # Store weight mask and sign matrix
         # Store trainable parameter
-        connection_properties["parameter"] = nn.Parameter(parameter) if not zero_connection else parameter
-        connection_properties["weight_mask"] = nn.Parameter(weight_mask, requires_grad=False) if not zero_connection else weight_mask
-        connection_properties["sign_matrix"] = nn.Parameter(sign_matrix, requires_grad=False) if not zero_connection else sign_matrix
+        connection_properties["parameter"] = parameter
+        connection_properties["weight_mask"] = weight_mask
+        connection_properties["sign_matrix"] = sign_matrix
         connection_properties["zero_connection"] = zero_connection
 
         # Add all of the properties to define the connection in Region class
         self.connections[dst_region_name] = connection_properties
-
-        # Manually register parameters if not a zero connection
-        if not zero_connection:
-            # Register the main parameter denoting weights of model
-            # Next, register the mask and sign matrix as parameters to ensure they're loaded in the same
-            self.register_parameter(dst_region_name, self.connections[dst_region_name]["parameter"])
-            self.register_parameter(f"{dst_region_name}_weight_mask", self.connections[dst_region_name]["weight_mask"])
-            self.register_parameter(f"{dst_region_name}_sign_matrix", self.connections[dst_region_name]["sign_matrix"])
 
     def __generate_masks(self):
         """Generate reusable full and zero masks for this region."""
