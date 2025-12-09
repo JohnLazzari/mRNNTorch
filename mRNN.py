@@ -650,12 +650,12 @@ class mRNN(nn.Module):
         if from_ in self.region_dict:
             # Gather recurrent weight matrix
             weight, mask, sign = self.gen_w(self.region_dict)
-            if self.constrained == True:
+            if self.rec_constrained == True:
                 weight = self.apply_dales_law(weight, mask, sign)
         else:
             # Gather input weight matrix
             weight, mask, sign = self.gen_w(self.inp_dict)
-            if self.constrained == True:
+            if self.inp_constrained == True:
                 weight = self.apply_dales_law(weight, mask, sign)
         
         # Store all of the weights to region from another
