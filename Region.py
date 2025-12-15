@@ -14,6 +14,7 @@ import math
 import matplotlib.pyplot as plt
 import json
 
+
 class Region(nn.Module):
     """
     Base class for regions used by mRNN.
@@ -30,7 +31,7 @@ class Region(nn.Module):
             keys {"parameter", "weight_mask", "sign_matrix", "zero_connection"}.
         masks (dict): Convenience masks including "ones" and "zeros" of length ``num_units``.
     """
-    
+
     def __init__(self, num_units, sign="pos", device="cuda"):
         """Construct a region.
 
@@ -50,11 +51,11 @@ class Region(nn.Module):
         self.__generate_masks()
 
     def add_connection(
-        self, 
-        dst_region_name, 
-        dst_region, 
+        self,
+        dst_region_name,
+        dst_region,
         sparsity,
-        zero_connection=False, 
+        zero_connection=False,
     ):
         """Add a connection from this region to ``dst_region``.
 
@@ -81,7 +82,7 @@ class Region(nn.Module):
         if dst_region_name in self.connections:
             if self.connections[dst_region_name]["zero_connection"] is False:
                 raise Exception("Connection is already registered as parameter")
-                
+
         """
         Here we will assert that users are only making connections from:
             1. recurrent region -> recurrent region
@@ -92,11 +93,13 @@ class Region(nn.Module):
         connection_properties = {}
 
         # Initialize connection parameters
-        parameter = torch.zeros(size=(dst_region.num_units, self.num_units), device=self.device)
+        parameter = torch.zeros(
+            size=(dst_region.num_units, self.num_units), device=self.device
+        )
         # Even though parameter is zero use this specifically to zero out the weight and sign matrix if zero connection
         # This is just to be extra safe to ensure everything about this connection is zero
         zero_con_mask = torch.zeros_like(parameter)
-        
+
         # Initialize sparse mask if sparsity is given
         if sparsity is not None:
             weight_mask = torch.empty_like(parameter, device=self.device)
@@ -112,7 +115,7 @@ class Region(nn.Module):
             sign_matrix = -weight_mask
         else:
             raise ValueError("sign can only be (pos) or (neg)")
-        
+
         """ In the case of zero connection, everything from parameter, mask, and sign will be zero in
             connections_dict. Additionally, they won't be registered as parameters, so nothing will be 
             initialized in the mRNN class either. This should ensure everything is always zero.
@@ -147,10 +150,9 @@ class Region(nn.Module):
     def has_connection_to(self, region):
         """
         Checks if there is a connection from the current region to the specified region.
-        
+
         Args:
             region (str): Name of the region to check for connection.
-        
         Returns:
             bool: True if there is a connection, otherwise False.
         """
@@ -162,7 +164,16 @@ class Region(nn.Module):
 
 
 class RecurrentRegion(Region):
-    def __init__(self, num_units, base_firing, init, sign="pos", device="cuda", parent_region=None, learnable_bias=False):
+    def __init__(
+        self,
+        num_units,
+        base_firing,
+        init,
+        sign="pos",
+        device="cuda",
+        parent_region=None,
+        learnable_bias=False,
+    ):
         super(RecurrentRegion, self).__init__(num_units, sign=sign, device=device)
         """Recurrent region (inherits from :class:`Region`).
 

@@ -26,7 +26,7 @@ DEFAULT_REC_REGIONS = {
     # Parent class or family region belongs to (for cell types)
     "parent_region": None,
     # Whether or not the base firing will be trainable
-    "learnable_bias": False
+    "learnable_bias": False,
 }
 
 DEFAULT_REC_CONNECTIONS = {
@@ -34,17 +34,14 @@ DEFAULT_REC_CONNECTIONS = {
     "sparsity": None
 }
 
-DEFAULT_INP_REGIONS = {
-    "name": "inp_",
-    "sign": "pos"
-}
+DEFAULT_INP_REGIONS = {"name": "inp_", "sign": "pos"}
 
-DEFAULT_INP_CONNECTIONS = {
-    "sparsity": None
-}
+DEFAULT_INP_CONNECTIONS = {"sparsity": None}
+
 
 def linear(x):
     return x
+
 
 class mRNN(nn.Module):
     """
@@ -85,23 +82,19 @@ class mRNN(nn.Module):
     """
 
     def __init__(
-        self, 
+        self,
         config=None,
         activation="relu",
-        noise_level_act=0.01, 
-        noise_level_inp=0.01, 
-        rec_constrained=True, 
-        inp_constrained=True, 
+        noise_level_act=0.01,
+        noise_level_inp=0.01,
+        rec_constrained=True,
+        inp_constrained=True,
         dt=10,
         tau=100,
         batch_first=True,
-        lower_bound_rec=0,
-        upper_bound_rec=10,
-        lower_bound_inp=0,
-        upper_bound_inp=10,
         spectral_radius=None,
         config_finalize=True,
-        device="cuda"
+        device="cuda",
     ):
         super(mRNN, self).__init__()
 
@@ -119,15 +112,11 @@ class mRNN(nn.Module):
         self.sigma_recur = noise_level_act
         self.sigma_input = noise_level_inp
         self.activation_name = activation
-        self.lower_bound_rec = lower_bound_rec
-        self.upper_bound_rec = upper_bound_rec
-        self.lower_bound_inp = lower_bound_inp
-        self.upper_bound_inp = upper_bound_inp
         self.spectral_radius = spectral_radius
         self.config_finalize = config_finalize
         self.rec_finalized = False
         self.inp_finalized = False
-        
+
         # Specify activation function
         # Only common activations are implemented
         if activation == "relu":
@@ -139,27 +128,29 @@ class mRNN(nn.Module):
         elif activation == "softplus":
             self.activation = nn.Softplus()
         elif activation == "linear":
-            self.activation == linear()
+            self.activation = linear
         else:
-            raise Exception("Only relu, tanh, sigmoid, or linear activations are implemented")
-        
+            raise Exception(
+                "Only relu, tanh, sigmoid, or linear activations are implemented"
+            )
+
         # Allow configuration file to be optional
         # If configuration is given, network will be automatically generated using it
         # Otherwise, user will manually build a network in their own class
         if config is not None:
 
             # Load and process configuration
-            with open(config, 'r') as f:
+            with open(config, "r") as f:
                 config = json.load(f)
-            
+
             # Default everything to empty dict
             # Nothing inherently needs to be specified and can instead be created in custom network
             # This should default all connectivity to zeros (not learnable)
-            config.setdefault('recurrent_regions', {})
-            config.setdefault('input_regions', {})
-            config.setdefault('recurrent_connections', {})
-            config.setdefault('input_connections', {})
-            
+            config.setdefault("recurrent_regions", {})
+            config.setdefault("input_regions", {})
+            config.setdefault("recurrent_connections", {})
+            config.setdefault("input_connections", {})
+
             """
                 Configuration file protocol:
                 
@@ -180,7 +171,7 @@ class mRNN(nn.Module):
                     Additionally, the config file itself defaults to None, which would then imply the user needs to
                     manually enter all regions and connections in the custom model.
             """
-            
+
             # Generate network structure
             self.__create_def_values(config)
 
@@ -195,9 +186,9 @@ class mRNN(nn.Module):
                         init=region["init"],
                         device=self.device,
                         parent_region=region["parent_region"],
-                        learnable_bias=region["learnable_bias"]
+                        learnable_bias=region["learnable_bias"],
                     )
-            
+
             if len(config["input_regions"]) >= 1:
                 # Generate input regions
                 for region in config["input_regions"]:
@@ -205,7 +196,7 @@ class mRNN(nn.Module):
                         name=region["name"],
                         num_units=region["num_units"],
                         sign=region["sign"],
-                        device=self.device
+                        device=self.device,
                     )
 
             # Now checking whether or not connections are specified in config
@@ -215,7 +206,7 @@ class mRNN(nn.Module):
                     self.add_recurrent_connection(
                         src_region=connection["src_region"],
                         dst_region=connection["dst_region"],
-                        sparsity=connection["sparsity"]
+                        sparsity=connection["sparsity"],
                     )
                 """
                     Finalization for Configuration:
@@ -233,22 +224,22 @@ class mRNN(nn.Module):
                     self.add_input_connection(
                         src_region=connection["src_region"],
                         dst_region=connection["dst_region"],
-                        sparsity=connection["sparsity"]
+                        sparsity=connection["sparsity"],
                     )
                 # Finalization input regions
                 if self.config_finalize:
                     self.finalize_inp_connectivity()
-    
+
     def add_recurrent_region(
-        self, 
-        name, 
-        num_units, 
-        sign=DEFAULT_REC_REGIONS["sign"], 
-        base_firing=DEFAULT_REC_REGIONS["base_firing"], 
-        init=DEFAULT_REC_REGIONS["init"], 
-        device="cuda", 
-        parent_region=DEFAULT_REC_REGIONS["parent_region"], 
-        learnable_bias=DEFAULT_REC_REGIONS["learnable_bias"]
+        self,
+        name,
+        num_units,
+        sign=DEFAULT_REC_REGIONS["sign"],
+        base_firing=DEFAULT_REC_REGIONS["base_firing"],
+        init=DEFAULT_REC_REGIONS["init"],
+        device="cuda",
+        parent_region=DEFAULT_REC_REGIONS["parent_region"],
+        learnable_bias=DEFAULT_REC_REGIONS["learnable_bias"],
     ):
         """Add a recurrent region to the network.
 
@@ -263,7 +254,9 @@ class mRNN(nn.Module):
             learnable_bias (bool): If True, baseline firing is trainable.
         """
         if self.rec_finalized:
-            raise Exception("Recurrent connectivity already finalized, please include all regions and connections beforehand")
+            raise Exception(
+                "Recurrent connectivity already finalized, please include all regions and connections beforehand"
+            )
 
         self.region_dict[name] = RecurrentRegion(
             num_units=num_units,
@@ -272,7 +265,7 @@ class mRNN(nn.Module):
             sign=sign,
             device=device,
             parent_region=parent_region,
-            learnable_bias=learnable_bias
+            learnable_bias=learnable_bias,
         )
         # General network parameters
         self.total_num_units = self.__get_total_num_units(self.region_dict)
@@ -283,11 +276,7 @@ class mRNN(nn.Module):
             self.region_mask_dict[region] = self.__gen_region_mask(region)
 
     def add_input_region(
-        self, 
-        name, 
-        num_units, 
-        sign=DEFAULT_INP_REGIONS["sign"], 
-        device="cuda"
+        self, name, num_units, sign=DEFAULT_INP_REGIONS["sign"], device="cuda"
     ):
         """Add an input region to the network.
 
@@ -298,16 +287,16 @@ class mRNN(nn.Module):
             device (str): Device where tensors for this region live.
         """
         if self.inp_finalized:
-            raise Exception("Input connectivity already finalized, please include all regions and connections beforehand")
+            raise Exception(
+                "Input connectivity already finalized, please include all regions and connections beforehand"
+            )
 
-        self.inp_dict[name] = InputRegion(
-            num_units=num_units,
-            sign=sign,
-            device=device
-        )
+        self.inp_dict[name] = InputRegion(num_units=num_units, sign=sign, device=device)
         self.total_num_inputs = self.__get_total_num_units(self.inp_dict)
-    
-    def add_recurrent_connection(self, src_region, dst_region, sparsity=DEFAULT_REC_CONNECTIONS["sparsity"]):
+
+    def add_recurrent_connection(
+        self, src_region, dst_region, sparsity=DEFAULT_REC_CONNECTIONS["sparsity"]
+    ):
         """Create a recurrent connection from one region to another.
 
         Registers the weight parameter and associated masks. If ``sparsity`` is
@@ -321,23 +310,27 @@ class mRNN(nn.Module):
         """
         # Ensure that no more connections can be added if network is finalized
         if self.rec_finalized:
-            raise Exception("Recurrent connectivity already finalized, please include all regions and connections beforehand")
+            raise Exception(
+                "Recurrent connectivity already finalized, please include all regions and connections beforehand"
+            )
 
         self.region_dict[src_region].add_connection(
             dst_region_name=dst_region,
             dst_region=self.region_dict[dst_region],
-            sparsity=sparsity
+            sparsity=sparsity,
         )
 
         weight = self.region_dict[src_region].connections[dst_region]["parameter"]
 
         # Check that this is changing in above dict
         if self.rec_constrained:
-            weight = self.__constrained_default_init_rec(weight)
+            self.__constrained_default_init_rec(weight)
         else:
-            weight = nn.init.xavier_normal_(weight)
+            nn.init.xavier_normal_(weight)
 
-    def add_input_connection(self, src_region, dst_region, sparsity=DEFAULT_INP_CONNECTIONS["sparsity"]):
+    def add_input_connection(
+        self, src_region, dst_region, sparsity=DEFAULT_INP_CONNECTIONS["sparsity"]
+    ):
         """Create an input connection from an input region to a recurrent region.
 
         Args:
@@ -347,48 +340,54 @@ class mRNN(nn.Module):
                 None, dense mask is used.
         """
         if self.inp_finalized:
-            raise Exception("Input connectivity already finalized, please include all regions and connections beforehand")
+            raise Exception(
+                "Input connectivity already finalized, please include all regions and connections beforehand"
+            )
 
         self.inp_dict[src_region].add_connection(
             dst_region_name=dst_region,
             dst_region=self.region_dict[dst_region],
-            sparsity=sparsity
+            sparsity=sparsity,
         )
 
         weight = self.inp_dict[src_region].connections[dst_region]["parameter"]
 
         # Check that this is changing in above dict
         if self.rec_constrained:
-            weight = self.__constrained_default_init_rec(weight)
+            self.__constrained_default_init_rec(weight)
         else:
-            weight = nn.init.xavier_normal_(weight)
+            nn.init.xavier_normal_(weight)
 
-    def set_spectral_radius(self, W):
+    def set_spectral_radius(self, W, W_tmp=None):
         """Scale recurrent weights so their spectral radius matches ``self.spectral_radius``.
 
         Usage:
         1. Define regions and connections (via config or manual methods).
         2. If building manually, call :meth:`finalize_connectivity` first.
         3. Set ``self.spectral_radius`` and call this method.
+        4. W_tmp will compute spectral radius of another network (i.e dales law network)
         """
         # Compute spectral radius
-        cur_spectral_radius = self.compute_spectral_radius(W)
+        if W_tmp is not None:
+            cur_spectral_radius = self.compute_spectral_radius(W_tmp)
+        else:
+            cur_spectral_radius = self.compute_spectral_radius(W)
         W_scaled = (W / cur_spectral_radius) * self.spectral_radius
         return W_scaled
-    
+
     def finalize_connectivity(self):
-        """ Finalize both input and recurrent connectivity
-            This function is primarily implemented so users don't have to 
-            separately call rec and inp connectivity functions
+        """Finalize both input and recurrent connectivity
+        This function is primarily implemented so users don't have to
+        separately call rec and inp connectivity functions
         """
-        if self.rec_finalized == False:
+        if not self.rec_finalized:
             self.finalize_rec_connectivity()
-        if self.inp_finalized == False:
+        if not self.inp_finalized:
             self.finalize_inp_connectivity()
 
     def finalize_rec_connectivity(self):
-        """ Fill rest of recurrent connections with zeros
-            Ensure finalized flag is set to true
+        """Fill rest of recurrent connections with zeros
+        Ensure finalized flag is set to true
         """
         for region in self.region_dict:
             self.__get_full_connectivity(self.region_dict[region])
@@ -396,7 +395,11 @@ class mRNN(nn.Module):
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
         # Set spectral radius
         if self.spectral_radius is not None:
-            W_rec = self.set_spectral_radius(W_rec)
+            if self.rec_constrained:
+                W_rec_tmp = self.apply_dales_law(W_rec, W_rec_mask, W_rec_sign_matrix)
+            else:
+                W_rec_tmp = W_rec * W_rec_mask
+            W_rec = self.set_spectral_radius(W_rec, W_tmp=W_rec_tmp)
         # Create parameters
         self.W_rec = nn.Parameter(W_rec)
         self.W_rec_mask = nn.Parameter(W_rec_mask, requires_grad=False)
@@ -405,8 +408,8 @@ class mRNN(nn.Module):
         self.rec_finalized = True
 
     def finalize_inp_connectivity(self):
-        """ Fill rest of input connections with zeros
-            Ensure finalized flag is set to true
+        """Fill rest of input connections with zeros
+        Ensure finalized flag is set to true
         """
         for inp in self.inp_dict:
             self.__get_full_connectivity(self.inp_dict[inp])
@@ -418,7 +421,7 @@ class mRNN(nn.Module):
         self.W_inp_sign_matrix = nn.Parameter(W_inp_sign_matrix, requires_grad=False)
         # Set finalized flag to true, no more connections can be added
         self.inp_finalized = True
-    
+
     def compute_spectral_radius(self, weight):
         """Compute the spectral radius (max |eigenvalue|) of a square matrix.
 
@@ -437,7 +440,7 @@ class mRNN(nn.Module):
     def gen_w(self, dict_):
         """
         Generates the full recurrent connectivity matrix and associated masks.
-        
+
         Returns:
             tuple: (W_rec, W_rec_mask, W_rec_sign_matrix)
                 - W_rec: Learnable weight matrix
@@ -453,10 +456,19 @@ class mRNN(nn.Module):
         # Iterate over the regions in dict_
         for cur_region in dict_:
             # List comprehensions to collect connections, masks, and sign matrices
-            connections_from_region = [dict_[cur_region].connections[connection]["parameter"] for connection in self.region_dict]
-            weight_mask_from_region = [dict_[cur_region].connections[connection]["weight_mask"] for connection in self.region_dict]
-            sign_matrix_from_region = [dict_[cur_region].connections[connection]["sign_matrix"] for connection in self.region_dict]
-            
+            connections_from_region = [
+                dict_[cur_region].connections[connection]["parameter"]
+                for connection in self.region_dict
+            ]
+            weight_mask_from_region = [
+                dict_[cur_region].connections[connection]["weight_mask"]
+                for connection in self.region_dict
+            ]
+            sign_matrix_from_region = [
+                dict_[cur_region].connections[connection]["sign_matrix"]
+                for connection in self.region_dict
+            ]
+
             # Concatenate the region-specific matrices and append to the lists
             region_connection_columns.append(torch.cat(connections_from_region, dim=0))
             region_weight_mask_columns.append(torch.cat(weight_mask_from_region, dim=0))
@@ -469,17 +481,14 @@ class mRNN(nn.Module):
 
         return W_rec, W_rec_mask, W_rec_sign
 
-    def apply_dales_law(self, W_rec, W_rec_mask, W_rec_sign_matrix, lower_bound=0, upper_bound=10):
+    def apply_dales_law(self, W_rec, W_rec_mask, W_rec_sign_matrix):
         """
         Applies Dale's Law constraints to the recurrent weight matrix.
         Dale's Law states that a neuron can be either excitatory or inhibitory, but not both.
-        
+
         Returns:
             torch.Tensor: Constrained weight matrix
         """
-        if lower_bound < 0:
-            raise ValueError("Lower bounds below zero not allowed for Dale's Law")
-        # TODO changed this to absolute value for now!!!!!!!!!!!!!!!
         return W_rec_mask * torch.abs(W_rec) * W_rec_sign_matrix
 
     def get_tonic_inp(self):
@@ -489,10 +498,12 @@ class mRNN(nn.Module):
         Returns:
             torch.Tensor: Vector of baseline firing rates
         """
-        return torch.cat([region.base_firing for region in self.region_dict.values()]).to(self.device) 
-    
-    def named_rec_regions(self, prefix=''):
-        """ Loop through rec region names and objects
+        return torch.cat(
+            [region.base_firing for region in self.region_dict.values()]
+        ).to(self.device)
+
+    def named_rec_regions(self, prefix=""):
+        """Loop through rec region names and objects
 
         Args:
             prefix (str, optional): Defaults to ''.
@@ -500,22 +511,26 @@ class mRNN(nn.Module):
         for name, region in self.region_dict.items():
             yield prefix + name, region
 
-    def named_inp_regions(self, prefix=''):
-        """ Loop through inp region names and objects
+    def named_inp_regions(self, prefix=""):
+        """Loop through inp region names and objects
 
         Args:
             prefix (str, optional): Defaults to ''.
         """
         for name, region in self.inp_dict.items():
             yield prefix + name, region
-    
+
     def get_region_size(self, region):
-        """ Get the nubmer of units in a region
+        """Get the nubmer of units in a region
 
         Args:
             region (str): region to get size of
         """
-        return self.region_dict[region].num_units if region in self.region_dict else self.inp_dict[region].num_units
+        return (
+            self.region_dict[region].num_units
+            if region in self.region_dict
+            else self.inp_dict[region].num_units
+        )
 
     def get_region_activity(self, act, *args):
         """
@@ -542,19 +557,24 @@ class mRNN(nn.Module):
             if self.__check_if_parent_region(region):
                 unique_regions.remove(region)
                 unique_regions.extend(self.__get_child_regions(region))
-        
-        # collect all necessary indices now
-        region_indices = {region: self.get_region_indices(region) for region in unique_regions}
 
-        region_acts = torch.cat([
-                act[..., start_idx:end_idx] 
+        # collect all necessary indices now
+        region_indices = {
+            region: self.get_region_indices(region) for region in unique_regions
+        }
+
+        region_acts = torch.cat(
+            [
+                act[..., start_idx:end_idx]
                 for region in unique_regions
                 for (start_idx, end_idx) in [region_indices[region]]
-        ], dim=-1)
+            ],
+            dim=-1,
+        )
         return region_acts
 
-    def get_weight_subset(self, *args):
-        """ Gather a subset of the weights
+    def get_weight_subset(self, *args, W=None):
+        """Gather a subset of the weights
 
         Args:
             mrnn (_type_): _description_
@@ -565,34 +585,42 @@ class mRNN(nn.Module):
             _type_: _description_
         """
 
-        # Gather original weight matrix and apply Dale's Law if constrained
-        # Can only be recurrent if not using to and from
-        if self.rec_constrained == True:
-            mrnn_weight = self.apply_dales_law(self.W_rec, self.W_rec_mask, self.W_rec_sign_matrix)
+        if W is None:
+            # Gather original weight matrix and apply Dale's Law if constrained
+            # Can only be recurrent if not using to and from
+            if self.rec_constrained:
+                mrnn_weight = self.apply_dales_law(
+                    self.W_rec, self.W_rec_mask, self.W_rec_sign_matrix
+                )
+            else:
+                mrnn_weight = self.W_rec * self.W_rec_mask
+
+            # Default to standard weight matrix if no regions are provided
+            if not args:
+                return mrnn_weight
         else:
-            mrnn_weight = self.W_rec
-        
-        # Default to standard weight matrix if no regions are provided
-        if not args:
-            return mrnn_weight
-        
+            mrnn_weight = W
+
         # Check if user specifies input region through args instead of to, from
         for region in args:
             if region in self.inp_dict:
-                raise Exception("Can only gather input subsets using to and from arguments")
+                raise Exception("Can only gather input subsets using get_projection")
 
         # This is used to store the final collected weight matrix
-        global_weight_collection = [] 
+        global_weight_collection = []
 
         region_indices = {region: self.get_region_indices(region) for region in args}
 
         # List comprehension that gathers all information gathering weight subset
         global_weight_collection = [
-            torch.cat([
-                mrnn_weight[src_start_idx:src_end_idx, dst_start_idx:dst_end_idx]
-                for dst_region in args
-                for dst_start_idx, dst_end_idx in [region_indices[dst_region]]
-            ], dim=1)
+            torch.cat(
+                [
+                    mrnn_weight[src_start_idx:src_end_idx, dst_start_idx:dst_end_idx]
+                    for dst_region in args
+                    for dst_start_idx, dst_end_idx in [region_indices[dst_region]]
+                ],
+                dim=1,
+            )
             for _, (src_start_idx, src_end_idx) in region_indices.items()
         ]
 
@@ -602,7 +630,7 @@ class mRNN(nn.Module):
         return global_weight_collection
 
     def get_projection(self, to, from_):
-        """ Gather a subset of the weights
+        """Gather a subset of the weights
 
         Args:
             mrnn (_type_): _description_
@@ -613,7 +641,7 @@ class mRNN(nn.Module):
             _type_: _description_
         """
 
-        # Store regions if parent regions are given    
+        # Store regions if parent regions are given
         to_regions = []
         from_regions = []
 
@@ -627,15 +655,25 @@ class mRNN(nn.Module):
             from_regions.extend(self.__get_child_regions(from_))
         else:
             from_regions.append(from_)
-        
+
         # Check which weight matrix to use based on from region
         if from_ in self.region_dict:
-            if self.constrained == True:
-                weight = self.apply_dales_law(self.W_rec, self.W_rec_mask, self.W_rec_sign_matrix)
+            if self.rec_constrained:
+                weight = self.apply_dales_law(
+                    self.W_rec, self.W_rec_mask, self.W_rec_sign_matrix
+                )
+            else:
+                weight = self.W_rec
+        elif from_ in self.inp_dict:
+            if self.inp_constrained:
+                weight = self.apply_dales_law(
+                    self.W_inp, self.W_inp_mask, self.W_inp_sign_matrix
+                )
+            else:
+                weight = self.W_inp
         else:
-            if self.constrained == True:
-                weight = self.apply_dales_law(self.W_inp, self.W_inp_mask, self.W_inp_sign_matrix)
-        
+            raise Exception("from_ region not in region or input dictionary")
+
         # Store all of the weights to region from another
         to_from_weight = []
         # Now go through each of the collected regions and get the weights
@@ -646,7 +684,9 @@ class mRNN(nn.Module):
             for from_region in from_regions:
                 # Gather indices
                 from_start_idx, from_end_idx = self.get_region_indices(from_region)
-                from_weight.append(weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx])
+                from_weight.append(
+                    weight[to_start_idx:to_end_idx, from_start_idx:from_end_idx]
+                )
             # Collect all of the weights for from region
             collected_from_weight = torch.cat(from_weight, dim=1)
             to_from_weight.append(collected_from_weight)
@@ -664,9 +704,11 @@ class mRNN(nn.Module):
         Returns:
             tuple: (start_idx, end_idx)
         """
-        
+
         if self.__check_if_parent_region(region):
-            raise ValueError("Can only get indices of a single region, not parent region")
+            raise ValueError(
+                "Can only get indices of a single region, not parent region"
+            )
 
         # Get the region indices
         start_idx = 0
@@ -687,11 +729,11 @@ class mRNN(nn.Module):
                 end_idx = start_idx + region_units
                 break
             start_idx += region_units
-        
+
         return start_idx, end_idx
 
     def get_initial_condition(self, xn):
-        """ Create an initial xn for the network
+        """Create an initial xn for the network
 
         Args:
             mrnn (_type_): _description_
@@ -727,11 +769,13 @@ class mRNN(nn.Module):
         """
         assert len(self.region_dict) > 0
         assert len(self.inp_dict) > 0
-        
+
         if inp.dim() != 3:
-            raise Exception("input must be 3 dimensional, \
+            raise Exception(
+                "input must be 3 dimensional, \
                             [batch, time, units] for batch_first=True, \
-                            and [time, batch, units] otherwise].")
+                            and [time, batch, units] otherwise]."
+            )
         if x0.dim() != 2:
             raise Exception("x0 must be 2 dimensional, [batch, units].")
 
@@ -739,11 +783,7 @@ class mRNN(nn.Module):
             # Apply Dale's Law if constrained
             if self.rec_constrained:
                 W_rec = self.apply_dales_law(
-                    self.W_rec, 
-                    self.W_rec_mask, 
-                    self.W_rec_sign_matrix, 
-                    self.lower_bound_rec, 
-                    self.upper_bound_rec
+                    self.W_rec, self.W_rec_mask, self.W_rec_sign_matrix
                 )
             else:
                 W_rec = self.W_rec * self.W_rec_mask
@@ -752,16 +792,12 @@ class mRNN(nn.Module):
             W_rec = W_rec.to(self.device)
             if W_rec.dtype != x0.dtype:
                 W_rec = W_rec.to(x0.dtype)
-        
+
         if W_inp is None:
             # Apply to input weights as well
             if self.inp_constrained:
                 W_inp = self.apply_dales_law(
-                    self.W_inp, 
-                    self.W_inp_mask, 
-                    self.W_inp_sign_matrix, 
-                    self.lower_bound_inp, 
-                    self.upper_bound_inp
+                    self.W_inp, self.W_inp_mask, self.W_inp_sign_matrix
                 )
             else:
                 W_inp = self.W_inp * self.W_inp_mask
@@ -771,7 +807,7 @@ class mRNN(nn.Module):
                 W_inp = W_inp.to(x0.dtype)
 
         baseline_inp = self.get_tonic_inp()
-        
+
         xn_next = x0
         hn_next = h0
 
@@ -786,7 +822,7 @@ class mRNN(nn.Module):
         else:
             seq_len = inp.shape[0]
             batch_shape = inp.shape[1]
-        
+
         # Process sequence
         for t in range(seq_len):
 
@@ -799,24 +835,27 @@ class mRNN(nn.Module):
             # Calculate noise terms
             if noise:
                 # Calculate noise constants
-                const_hid = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_recur**2)
-                const_inp = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_input**2)
+                const_hid = (1 / self.alpha) * np.sqrt(
+                    2 * self.alpha * self.sigma_recur**2
+                )
+                const_inp = (1 / self.alpha) * np.sqrt(
+                    2 * self.alpha * self.sigma_input**2
+                )
                 # Sample from normal distribution and scale by constant term
                 # Separate noise levels will be applied to each neuron/input
-                perturb_hid = const_hid * torch.randn(size=(batch_shape, self.total_num_units), device=self.device)
-                perturb_inp = const_inp * torch.randn(size=(batch_shape, self.total_num_inputs), device=self.device)
+                perturb_hid = const_hid * torch.randn(
+                    size=(batch_shape, self.total_num_units), device=self.device
+                )
+                perturb_inp = const_inp * torch.randn(
+                    size=(batch_shape, self.total_num_inputs), device=self.device
+                )
             else:
                 perturb_hid = perturb_inp = 0
 
             # Update hidden state
             # Discretized equation of the form: x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)
-            xn_next = (xn_next 
-                        + self.alpha 
-                        * (-xn_next
-                            + (W_rec @ hn_next.T).T
-                            + baseline_inp
-                            + perturb_hid
-                        )
+            xn_next = xn_next + self.alpha * (
+                -xn_next + (W_rec @ hn_next.T).T + baseline_inp + perturb_hid
             )
 
             # Add input
@@ -835,7 +874,7 @@ class mRNN(nn.Module):
             hn_next = self.activation(xn_next)
             new_xs.append(xn_next)
             new_hs.append(hn_next)
-        
+
         # Correct the final output sizes based on input shape
         if self.batch_first:
             x_final = torch.stack(new_xs, dim=1)
@@ -843,16 +882,16 @@ class mRNN(nn.Module):
         else:
             x_final = torch.stack(new_xs, dim=0)
             h_final = torch.stack(new_hs, dim=0)
-        
+
         return x_final, h_final
-    
+
     def __create_def_values(self, config):
         """Generate default values for configuration
 
         Args:
             config (json): Network configuration file
         """
-        
+
         # Set default values for recurrent region connections
         for i, region in enumerate(config["recurrent_regions"]):
             # Go through all possible default options in default dict
@@ -899,13 +938,13 @@ class mRNN(nn.Module):
             torch.Tensor: Binary mask
         """
         mask = []
-        
+
         for next_region in self.region_dict:
             if region == next_region:
                 mask.append(self.region_dict[region].masks["ones"])
             else:
                 mask.append(self.region_dict[next_region].masks["zeros"])
-        
+
         return torch.cat(mask).to(self.device)
 
     def __get_full_connectivity(self, region):
@@ -922,7 +961,7 @@ class mRNN(nn.Module):
                     dst_region_name=other_region,
                     dst_region=self.region_dict[other_region],
                     sparsity=None,
-                    zero_connection=True
+                    zero_connection=True,
                 )
 
     def __get_total_num_units(self, dict_):
@@ -948,17 +987,16 @@ class mRNN(nn.Module):
             if self.region_dict[region].parent_region == parent_region:
                 child_region_list.append(region)
         return tuple(child_region_list)
-    
+
     def __constrained_default_init_rec(self, weight):
         """Default init for recurrent weights under Dale's Law constraints.
 
         Draws weights from a zero-mean normal with variance 1/(2H), then applies
         a sign mask to respect excitation/inhibition of source regions.
         """
-        weight = torch.normal(mean=0, std=np.sqrt(1 / (2*self.total_num_units)), size=weight.shape, device=self.device)
+        nn.init.normal_(weight, mean=0, std=np.sqrt(1 / (2 * self.total_num_units)))
         mask = torch.sign(weight)
         weight *= mask
-        return weight
 
     def __constrained_default_init_inp(self, weight):
         """Default init for input weights under Dale's Law constraints.
@@ -966,7 +1004,10 @@ class mRNN(nn.Module):
         Draws weights from a zero-mean normal with variance 1/(H + I), then
         applies a sign mask to respect region sign.
         """
-        weight = torch.normal(mean=0, std=np.sqrt(1 / (self.total_num_units + self.total_num_inputs)), size=weight.shape, device=self.device)
+        nn.init.torch.normal_(
+            weight,
+            mean=0,
+            std=np.sqrt(1 / (self.total_num_units + self.total_num_inputs)),
+        )
         mask = torch.sign(weight)
         weight *= mask
-        return weight
