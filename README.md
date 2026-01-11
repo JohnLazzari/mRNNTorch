@@ -1,74 +1,64 @@
 # mRNNTorch
-**Welcome to mRNNTorch!**
-This small Python package allows users to effectively build and analyze multi-regional recurrent neural networks (mRNNs) in PyTorch. The `mRNN` module works similar to PyTorch's `nn.RNN` module and can be included in any custom network inheriting from `nn.Module`. Given the complexity of manually building and collecting weight matrices, mRNNTorch provides a solution to automize this process by letting the user specify their network configuration for fast prototyping!
+mRNNTorch is a small Python package for building and analyzing multi-regional recurrent neural networks (mRNNs) in PyTorch. The `mRNN` module mirrors `torch.nn.RNN` usage while managing region-level connectivity, masks, and constraints so you can prototype quickly.
 
-## mRNNTorch Structure
+## Highlights
+- Define recurrent and input regions in JSON, Python, or a mix of both
+- Automatic assembly of block weight matrices and masks
+- Optional sign constraints (Dale's Law) and spectral radius scaling
+- Analysis helpers for fixed points, flow fields, and linearization
 
-|     Component      |                          Description                                       |
-|     ---------      | --------------------------------------------------------------------------  |
-| mRNNTorch.mRNN     | Defines the mRNN module to use in custom network inheriting from nn.Module  |
-| mRNNTorch.analysis | Analysis tools that work directly on an mRNN object to explore its dynamics |
-| mRNNTorch.Region   | Region class that defines the properties of a region used in the mRNN object|
+## Package layout
+| Component | Description |
+| --- | --- |
+| `mrnntorch.mRNN` | Core mRNN module for building custom networks |
+| `mrnntorch.region` | Region classes and connectivity primitives |
+| `mrnntorch.analysis` | Analysis utilities operating on an mRNN instance |
 
-## Usage
-### mRNN
-There are two primary ways to build an mRNN using mRNNTorch
+## Installation
+Install from source:
 
-1. Specify a json configuration file with recurrent and input regions and connections
-2. Manually design the mRNN within your own custom model
-
-Additionally, users can mix and match approaches. Json files are convenient for saving previous model configuations and easily reusing, however manually entering many connections can be cumbersome. Defining connections in your own custom model may be less flexible across configurations, but can allow for ease of model definition.
-
-Below we provide an example use case:
-
-```python
-from mRNNTorch.mRNN import mRNN
-
-# Mix of config and manual entry
-class MyMRNN(nn.Module):
-    def __init__(self, config):
-        super(MyMRNN, self).__init__()
-        
-        """
-            Here, our config defines our regions and
-            the input connections
-            If we don't define recurrent connections in 
-            the config, we can still enter them here.
-        """
-        self.mrnn = mRNN(config)
-
-        connections = ["r1", "r2"]
-
-        for src_region in connection_props:
-            for dst_region in connection_props:
-                self.mrnn.add_recurrent_connection(
-                    src_region,
-                    dst_region
-                )
-
-        """
-            Whenever defining connectivity or regions outside of the config,
-            we must use finalize_connectivity() in order to pad unconnected regions
-            with zeros. Otherwise, an error will occur.
-
-            If all regions and connections are defined in the config, the model will
-            automatically finalize connectivity unless config_finalize is set to False.
-        """
-
-        self.mrnn.finalize_connectivity()
-    
-    forward(self, inp, x, h):
-        xn, hn = self.mrnn(inp, x, h)
-        return xn, hn
+```bash
+python -m pip install -e .
 ```
 
+## Quick start
+There are two ways to define an mRNN:
+1. Pass a JSON config file for regions and connections.
+2. Build regions and connections manually inside your model.
+
+You can also mix both approaches, then finalize connectivity:
+
+```python
+import torch.nn as nn
+from mrnntorch.mRNN import mRNN
+
+class MyMRNN(nn.Module):
+    def __init__(self, config_path: str):
+        super().__init__()
+        self.mrnn = mRNN(config_path, config_finalize=False)
+
+        # Add any extra recurrent connections not in the config
+        regions = ["r1", "r2"]
+        for src in regions:
+            for dst in regions:
+                self.mrnn.add_recurrent_connection(src, dst)
+
+        # Required if you manually add regions/connections
+        self.mrnn.finalize_connectivity()
+
+    def forward(self, inp, x, h):
+        return self.mrnn(inp, x, h)
+```
+
+## Configuration files
+The config format specifies recurrent/input regions and their connections. See `src/mrnntorch/examples/configurations/CBGTCL.json` for a concrete example.
+
 ## Requirements
+Runtime dependencies:
+- torch
+- numpy
+- matplotlib
+- scikit-learn (analysis helpers)
 
-The following packages are necessary to use the mRNNTorch package:
-
-* torch
-* numpy
-* matplotlib
-* sklearn (for analysis module)
-
-**This repository is still undergoing major changes, feel free to contribute!**
+## Status
+This repository is still under active development; contributions are welcome.
