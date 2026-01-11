@@ -2,41 +2,37 @@
 
 Implements the multi-regional recurrent neural network (mRNN) building blocks
 and step-wise dynamics, along with helpers for connectivity, constraints, and
-initialization.
-"""
+initialization."""
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-import matplotlib.pyplot as plt
 import json
 from collections import OrderedDict
-from mRNNTorch.Region import RecurrentRegion, InputRegion
+from mrnntorch.region.region_base import Region
+from mrnntorch.region.recurrent_region import RecurrentRegion
+from mrnntorch.region.input_region import InputRegion
+from mrnntorch.region.region_base import (
+    DEFAULT_REC_REGIONS,
+    DEFAULT_REGION_BASE,
+    DEFAULT_CONNECTIONS,
+)
 
-DEFAULT_REC_REGIONS = {
-    # Name of the region
-    "name": "region_",
-    # Initial condition of region (xn)
-    "init": 0,
-    # Whether connection is excitatory or inhibitory
-    "sign": "pos",
-    # bias or baseline firing of region
-    "base_firing": 0,
-    # Parent class or family region belongs to (for cell types)
-    "parent_region": None,
-    # Whether or not the base firing will be trainable
-    "learnable_bias": False,
+
+DEFAULTS_MRNN = {
+    "config": None,
+    "activation": "relu",
+    "noise_level_act": 0.01,
+    "noise_level_inp": 0.01,
+    "rec_constrained": True,
+    "inp_constrained": True,
+    "dt": 10,
+    "tau": 100,
+    "batch_first": True,
+    "spectral_radius": None,
+    "config_finalize": True,
+    "device": "cuda",
 }
-
-DEFAULT_REC_CONNECTIONS = {
-    # How sparse the connections will be (float from 0-1)
-    "sparsity": None
-}
-
-DEFAULT_INP_REGIONS = {"name": "inp_", "sign": "pos"}
-
-DEFAULT_INP_CONNECTIONS = {"sparsity": None}
 
 
 def linear(x):
@@ -44,60 +40,57 @@ def linear(x):
 
 
 class mRNN(nn.Module):
-    """
-    Multi-Regional Recurrent Neural Network (mRNN).
-
-    Simulates interactions between multiple recurrent "regions" with optional
-    input regions. Supports Dale's Law constraints, tonic inputs, noise in
-    hidden state and inputs, and basic step-wise dynamics with configurable
-    discretization parameters.
-
-    Key features:
-    - Multiple regions with independent sizes and signs (excitatory/inhibitory)
-    - Dale's Law constraints via sign masks on weights
-    - Optional noise on hidden state and input
-    - Tonic (baseline) input per region
-    - JSON-based configuration or fully manual construction
-
-    Args:
-        config (str | None): Path to a JSON configuration file describing
-            recurrent regions, input regions, and their connections. If None,
-            build the network manually by calling the add_* methods.
-        activation (str): One of {"relu", "tanh", "sigmoid", "softplus", "linear"}.
-        noise_level_act (float): Std of hidden-state noise term. Default: 0.01.
-        noise_level_inp (float): Std of input noise term. Default: 0.01.
-        constrained (bool): If True, apply Dale's Law constraints. Default: True.
-        dt (float): Discrete step in ms used for the Euler update. Default: 10.
-        tau (float): Time constant in ms; alpha = dt / tau. Default: 100.
-        batch_first (bool): If True, sequences are [B, T, ...]; else [T, B, ...].
-        lower_bound_rec (float): Lower bound used when constraining recurrent weights.
-        upper_bound_rec (float): Upper bound used when constraining recurrent weights.
-        lower_bound_inp (float): Lower bound used when constraining input weights.
-        upper_bound_inp (float): Upper bound used when constraining input weights.
-        spectral_radius (float | None): If set, scales recurrent weights so the
-            spectral radius equals this value after finalization.
-        config_finalize (bool): If True and a config is supplied, finalize
-            connectivity after reading config. Default: True.
-        device (str): Torch device string (e.g., "cpu" or "cuda"). Default: "cuda".
-    """
-
     def __init__(
         self,
-        config=None,
-        activation="relu",
-        noise_level_act=0.01,
-        noise_level_inp=0.01,
-        rec_constrained=True,
-        inp_constrained=True,
-        dt=10,
-        tau=100,
-        batch_first=True,
-        spectral_radius=None,
-        config_finalize=True,
-        device="cuda",
+        config: str = DEFAULTS_MRNN["config"],
+        activation: str = DEFAULTS_MRNN["activation"],
+        noise_level_act: float = DEFAULTS_MRNN["noise_level_act"],
+        noise_level_inp: float = DEFAULTS_MRNN["noise_level_inp"],
+        rec_constrained: bool = DEFAULTS_MRNN["rec_constrained"],
+        inp_constrained: bool = DEFAULTS_MRNN["inp_constrained"],
+        dt: float = DEFAULTS_MRNN["dt"],
+        tau: float = DEFAULTS_MRNN["tau"],
+        batch_first: bool = DEFAULTS_MRNN["batch_first"],
+        spectral_radius: float = DEFAULTS_MRNN["spectral_radius"],
+        config_finalize: bool = DEFAULTS_MRNN["config_finalize"],
+        device: str = DEFAULTS_MRNN["device"],
     ):
         super(mRNN, self).__init__()
+        """
+        Multi-Regional Recurrent Neural Network (mRNN).
 
+        Simulates interactions between multiple recurrent "regions" with optional
+        input regions. Supports Dale's Law constraints, tonic inputs, noise in
+        hidden state and inputs, and basic step-wise dynamics with configurable
+        discretization parameters.
+
+        Key features:
+        - Multiple regions with independent sizes and signs (excitatory/inhibitory)
+        - Dale's Law constraints via sign masks on weights
+        - Optional noise on hidden state and input
+        - Tonic (baseline) input per region
+        - JSON-based configuration or fully manual construction
+
+        Args:
+            config (str | None): Path to a JSON configuration file describing
+                recurrent regions, input regions, and their connections. If None,
+                build the network manually by calling the add_* methods.
+            activation (str): One of {"relu", "tanh", "sigmoid", "softplus", "linear"}.
+            noise_level_act (float): Std of hidden-state noise term. Default: 0.01.
+            noise_level_inp (float): Std of input noise term. Default: 0.01.
+            rec_constrained (bool): If True, apply Dale's Law to rec regions. Default: True.
+            inp_constrained (bool): If True, apply Dale's Law to inp regions. Default: True.
+            dt (float): Discrete step in ms used for the Euler update. Default: 10.
+            tau (float): Time constant in ms; alpha = dt / tau. Default: 100.
+            batch_first (bool): If True, sequences are [B, T, ...]; else [T, B, ...].
+            spectral_radius (float | None): If set, scales recurrent weights so the
+                spectral radius equals this value after finalization.
+            config_finalize (bool): If True and a config is supplied, finalize
+                connectivity after reading config. Default: True.
+            device (str): Torch device string (e.g., "cpu" or "cuda"). Default: "cuda".
+        """
+
+        # TODO potentially add getitem and setitem with str indexing
         # Initialize network parameters
         self.region_dict = {}
         self.inp_dict = {}
@@ -138,18 +131,16 @@ class mRNN(nn.Module):
         # If configuration is given, network will be automatically generated using it
         # Otherwise, user will manually build a network in their own class
         if config is not None:
-
             # Load and process configuration
             with open(config, "r") as f:
-                config = json.load(f)
+                config_file = json.load(f)
 
             # Default everything to empty dict
             # Nothing inherently needs to be specified and can instead be created in custom network
-            # This should default all connectivity to zeros (not learnable)
-            config.setdefault("recurrent_regions", {})
-            config.setdefault("input_regions", {})
-            config.setdefault("recurrent_connections", {})
-            config.setdefault("input_connections", {})
+            config_file.setdefault("recurrent_regions", {})
+            config_file.setdefault("input_regions", {})
+            config_file.setdefault("recurrent_connections", {})
+            config_file.setdefault("input_connections", {})
 
             """
                 Configuration file protocol:
@@ -173,11 +164,11 @@ class mRNN(nn.Module):
             """
 
             # Generate network structure
-            self.__create_def_values(config)
+            self._create_def_values(config_file)
 
-            if len(config["recurrent_regions"]) >= 1:
+            if len(config_file["recurrent_regions"]) >= 1:
                 # Generate recurrent regions
-                for region in config["recurrent_regions"]:
+                for region in config_file["recurrent_regions"]:
                     self.add_recurrent_region(
                         name=region["name"],
                         num_units=region["num_units"],
@@ -189,9 +180,9 @@ class mRNN(nn.Module):
                         learnable_bias=region["learnable_bias"],
                     )
 
-            if len(config["input_regions"]) >= 1:
+            if len(config_file["input_regions"]) >= 1:
                 # Generate input regions
-                for region in config["input_regions"]:
+                for region in config_file["input_regions"]:
                     self.add_input_region(
                         name=region["name"],
                         num_units=region["num_units"],
@@ -200,9 +191,9 @@ class mRNN(nn.Module):
                     )
 
             # Now checking whether or not connections are specified in config
-            if len(config["recurrent_connections"]) >= 1:
+            if len(config_file["recurrent_connections"]) >= 1:
                 # Generate recurrent connections
-                for connection in config["recurrent_connections"]:
+                for connection in config_file["recurrent_connections"]:
                     self.add_recurrent_connection(
                         src_region=connection["src_region"],
                         dst_region=connection["dst_region"],
@@ -218,9 +209,9 @@ class mRNN(nn.Module):
                 if self.config_finalize:
                     self.finalize_rec_connectivity()
 
-            if len(config["input_connections"]) >= 1:
+            if len(config_file["input_connections"]) >= 1:
                 # Generate input connections
-                for connection in config["input_connections"]:
+                for connection in config_file["input_connections"]:
                     self.add_input_connection(
                         src_region=connection["src_region"],
                         dst_region=connection["dst_region"],
@@ -230,16 +221,59 @@ class mRNN(nn.Module):
                 if self.config_finalize:
                     self.finalize_inp_connectivity()
 
+    def __setitem__(self, idx: str, region: RecurrentRegion | InputRegion):
+        """
+        Assign a recurrent region or input region to a valid index in mRNN
+
+        Args:
+            idx (str): an input or recurrent region in the mRNN
+            region (RecurrentRegion | InputRegion): the new region used for assignment
+        """
+        assert isinstance(idx, str), "Only string indexing to regions is allowed"
+        if idx in self.region_dict:
+            if isinstance(region, RecurrentRegion):
+                self.region_dict[idx] = region
+            else:
+                raise ValueError(
+                    "Not a RecurrentRegion object, \
+                    cannot assign to recurrent region"
+                )
+        elif idx in self.inp_dict:
+            if isinstance(region, InputRegion):
+                self.inp_dict[idx] = region
+            else:
+                raise ValueError(
+                    "Not an InputRegion object, \
+                    cannot assign to input region"
+                )
+        else:
+            raise ValueError("Index not a valid recurrent or input region")
+
+    def __getitem__(self, idx: str) -> RecurrentRegion | InputRegion:
+        """
+        Index a recurrent region or input region in mRNN
+
+        Args:
+            idx (str): an input or recurrent region in the mRNN
+        """
+        assert isinstance(idx, str), "Only string indexing to regions is allowed"
+        if idx in self.region_dict:
+            return self.region_dict[idx]
+        elif idx in self.inp_dict:
+            return self.inp_dict[idx]
+        else:
+            raise ValueError("Index not a valid recurrent or input region")
+
     def add_recurrent_region(
         self,
-        name,
-        num_units,
-        sign=DEFAULT_REC_REGIONS["sign"],
-        base_firing=DEFAULT_REC_REGIONS["base_firing"],
-        init=DEFAULT_REC_REGIONS["init"],
-        device="cuda",
-        parent_region=DEFAULT_REC_REGIONS["parent_region"],
-        learnable_bias=DEFAULT_REC_REGIONS["learnable_bias"],
+        name: str,
+        num_units: int,
+        sign: str = DEFAULT_REC_REGIONS["sign"],
+        base_firing: float = DEFAULT_REC_REGIONS["base_firing"],
+        init: float = DEFAULT_REC_REGIONS["init"],
+        device: str = DEFAULT_REC_REGIONS["device"],
+        parent_region: str = DEFAULT_REC_REGIONS["parent_region"],
+        learnable_bias: bool = DEFAULT_REC_REGIONS["learnable_bias"],
     ):
         """Add a recurrent region to the network.
 
@@ -255,9 +289,11 @@ class mRNN(nn.Module):
         """
         if self.rec_finalized:
             raise Exception(
-                "Recurrent connectivity already finalized, please include all regions and connections beforehand"
+                "Recurrent connectivity already finalized, please \
+                include all regions and connections beforehand"
             )
 
+        # Create region
         self.region_dict[name] = RecurrentRegion(
             num_units=num_units,
             base_firing=base_firing,
@@ -268,15 +304,19 @@ class mRNN(nn.Module):
             learnable_bias=learnable_bias,
         )
         # General network parameters
-        self.total_num_units = self.__get_total_num_units(self.region_dict)
+        self.total_num_units = self._get_total_num_units(self.region_dict)
         # Get indices for specific regions
         for region in self.region_dict:
             # Get the mask for the whole region, regardless of cell type
             self.region_mask_dict[region] = {}
-            self.region_mask_dict[region] = self.__gen_region_mask(region)
+            self.region_mask_dict[region] = self._gen_region_mask(region)
 
     def add_input_region(
-        self, name, num_units, sign=DEFAULT_INP_REGIONS["sign"], device="cuda"
+        self,
+        name: str,
+        num_units: int,
+        sign: str = DEFAULT_REGION_BASE["sign"],
+        device: str = DEFAULT_REGION_BASE["device"],
     ):
         """Add an input region to the network.
 
@@ -288,19 +328,27 @@ class mRNN(nn.Module):
         """
         if self.inp_finalized:
             raise Exception(
-                "Input connectivity already finalized, please include all regions and connections beforehand"
+                "Input connectivity already finalized, \
+                please include all regions and connections beforehand"
             )
 
+        # Create region
         self.inp_dict[name] = InputRegion(num_units=num_units, sign=sign, device=device)
-        self.total_num_inputs = self.__get_total_num_units(self.inp_dict)
+        # Update number of input units
+        self.total_num_inputs = self._get_total_num_units(self.inp_dict)
 
     def add_recurrent_connection(
-        self, src_region, dst_region, sparsity=DEFAULT_REC_CONNECTIONS["sparsity"]
+        self,
+        src_region: str,
+        dst_region: str,
+        sparsity: float = DEFAULT_CONNECTIONS["sparsity"],
     ):
         """Create a recurrent connection from one region to another.
 
         Registers the weight parameter and associated masks. If ``sparsity`` is
         provided, a binary connectivity mask is sampled accordingly.
+
+        Currently not allowed to make a zero connection.
 
         Args:
             src_region (str): Source recurrent region name.
@@ -311,27 +359,34 @@ class mRNN(nn.Module):
         # Ensure that no more connections can be added if network is finalized
         if self.rec_finalized:
             raise Exception(
-                "Recurrent connectivity already finalized, please include all regions and connections beforehand"
+                "Recurrent connectivity already finalized, \
+                please include all regions and connections beforehand"
             )
 
+        # Add connection to specified region object
         self.region_dict[src_region].add_connection(
             dst_region_name=dst_region,
-            dst_region=self.region_dict[dst_region],
+            dst_region_units=self.region_dict[dst_region].num_units,
             sparsity=sparsity,
         )
 
-        weight = self.region_dict[src_region].connections[dst_region]["parameter"]
+        # Get the empty weights
+        weight = self.region_dict[src_region][dst_region].parameter
 
-        # Check that this is changing in above dict
+        # initialize the empty weights based on constraints
         if self.rec_constrained:
-            self.__constrained_default_init_rec(weight)
+            self._constrained_default_init_rec(weight)
         else:
             nn.init.xavier_normal_(weight)
 
     def add_input_connection(
-        self, src_region, dst_region, sparsity=DEFAULT_INP_CONNECTIONS["sparsity"]
+        self,
+        src_region: str,
+        dst_region: str,
+        sparsity: float | None = DEFAULT_CONNECTIONS["sparsity"],
     ):
         """Create an input connection from an input region to a recurrent region.
+        Currently not allowed to make a zero connection.
 
         Args:
             src_region (str): Source input region name.
@@ -341,24 +396,29 @@ class mRNN(nn.Module):
         """
         if self.inp_finalized:
             raise Exception(
-                "Input connectivity already finalized, please include all regions and connections beforehand"
+                "Input connectivity already finalized, \
+                please include all regions and connections beforehand"
             )
 
+        # Add connection to specified input region object
         self.inp_dict[src_region].add_connection(
             dst_region_name=dst_region,
-            dst_region=self.region_dict[dst_region],
+            dst_region_units=self.region_dict[dst_region].num_units,
             sparsity=sparsity,
         )
 
-        weight = self.inp_dict[src_region].connections[dst_region]["parameter"]
+        # Access empty input weight
+        weight = self.inp_dict[src_region][dst_region].parameter
 
-        # Check that this is changing in above dict
-        if self.rec_constrained:
-            self.__constrained_default_init_rec(weight)
+        # initialize the weight depending on constraints
+        if self.inp_constrained:
+            self._constrained_default_init_inp(weight)
         else:
             nn.init.xavier_normal_(weight)
 
-    def set_spectral_radius(self, W, W_tmp=None):
+    def set_spectral_radius(
+        self, W: torch.Tensor, W_tmp: torch.Tensor = None
+    ) -> torch.Tensor:
         """Scale recurrent weights so their spectral radius matches ``self.spectral_radius``.
 
         Usage:
@@ -390,7 +450,7 @@ class mRNN(nn.Module):
         Ensure finalized flag is set to true
         """
         for region in self.region_dict:
-            self.__get_full_connectivity(self.region_dict[region])
+            self._get_full_connectivity(self.region_dict[region])
         # Apply Dale's Law if constrained
         W_rec, W_rec_mask, W_rec_sign_matrix = self.gen_w(self.region_dict)
         # Set spectral radius
@@ -412,7 +472,7 @@ class mRNN(nn.Module):
         Ensure finalized flag is set to true
         """
         for inp in self.inp_dict:
-            self.__get_full_connectivity(self.inp_dict[inp])
+            self._get_full_connectivity(self.inp_dict[inp])
         # Apply to input weights as well
         W_inp, W_inp_mask, W_inp_sign_matrix = self.gen_w(self.inp_dict)
         # Create parameters
@@ -422,7 +482,7 @@ class mRNN(nn.Module):
         # Set finalized flag to true, no more connections can be added
         self.inp_finalized = True
 
-    def compute_spectral_radius(self, weight):
+    def compute_spectral_radius(self, weight: torch.Tensor) -> float:
         """Compute the spectral radius (max |eigenvalue|) of a square matrix.
 
         Args:
@@ -437,7 +497,7 @@ class mRNN(nn.Module):
         spectral_radius = abs_eig_vals.max()
         return spectral_radius
 
-    def gen_w(self, dict_):
+    def gen_w(self, dict_: dict) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Generates the full recurrent connectivity matrix and associated masks.
 
@@ -456,16 +516,17 @@ class mRNN(nn.Module):
         # Iterate over the regions in dict_
         for cur_region in dict_:
             # List comprehensions to collect connections, masks, and sign matrices
+            # calling Region[connection] should invoke __getitem__
             connections_from_region = [
-                dict_[cur_region].connections[connection]["parameter"]
+                dict_[cur_region][connection].parameter
                 for connection in self.region_dict
             ]
             weight_mask_from_region = [
-                dict_[cur_region].connections[connection]["weight_mask"]
+                dict_[cur_region][connection].weight_mask
                 for connection in self.region_dict
             ]
             sign_matrix_from_region = [
-                dict_[cur_region].connections[connection]["sign_matrix"]
+                dict_[cur_region][connection].sign_matrix
                 for connection in self.region_dict
             ]
 
@@ -473,7 +534,6 @@ class mRNN(nn.Module):
             region_connection_columns.append(torch.cat(connections_from_region, dim=0))
             region_weight_mask_columns.append(torch.cat(weight_mask_from_region, dim=0))
             region_sign_matrix_columns.append(torch.cat(sign_matrix_from_region, dim=0))
-
         # Concatenate all region-specific matrices along the column dimension
         W_rec = torch.cat(region_connection_columns, dim=1)
         W_rec_mask = torch.cat(region_weight_mask_columns, dim=1)
@@ -481,7 +541,12 @@ class mRNN(nn.Module):
 
         return W_rec, W_rec_mask, W_rec_sign
 
-    def apply_dales_law(self, W_rec, W_rec_mask, W_rec_sign_matrix):
+    def apply_dales_law(
+        self,
+        W_rec: torch.Tensor,
+        W_rec_mask: torch.Tensor,
+        W_rec_sign_matrix: torch.Tensor,
+    ) -> torch.Tensor:
         """
         Applies Dale's Law constraints to the recurrent weight matrix.
         Dale's Law states that a neuron can be either excitatory or inhibitory, but not both.
@@ -502,7 +567,7 @@ class mRNN(nn.Module):
             [region.base_firing for region in self.region_dict.values()]
         ).to(self.device)
 
-    def named_rec_regions(self, prefix=""):
+    def named_rec_regions(self, prefix: str = ""):
         """Loop through rec region names and objects
 
         Args:
@@ -511,7 +576,7 @@ class mRNN(nn.Module):
         for name, region in self.region_dict.items():
             yield prefix + name, region
 
-    def named_inp_regions(self, prefix=""):
+    def named_inp_regions(self, prefix: str = ""):
         """Loop through inp region names and objects
 
         Args:
@@ -520,8 +585,8 @@ class mRNN(nn.Module):
         for name, region in self.inp_dict.items():
             yield prefix + name, region
 
-    def get_region_size(self, region):
-        """Get the nubmer of units in a region
+    def get_region_size(self, region: str) -> int:
+        """Get the number of units in a region
 
         Args:
             region (str): region to get size of
@@ -532,13 +597,13 @@ class mRNN(nn.Module):
             else self.inp_dict[region].num_units
         )
 
-    def get_region_activity(self, act, *args):
+    def get_region_activity(self, act: torch.Tensor, *args) -> torch.Tensor:
         """
         Takes in hn and the specified region and returns the activity hn for the corresponding region
 
         Args:
-            region (str): Name of the region
-            hn (Torch.Tensor): tensor containing model hidden activity. Activations must be in last dimension (-1)
+            act (Torch.Tensor): tensor containing model hidden activity. Activations must be in last dimension (-1)
+            args (str): name of regions to collect activity from
 
         Returns:
             region_hn: tensor containing hidden activity only for specified region
@@ -552,9 +617,11 @@ class mRNN(nn.Module):
             if region in self.inp_dict:
                 raise Exception("Can only get activity for recurrent regions")
 
+        args = self._ensure_order(*args)
+
         # Go and check if any parent regions are entered
         for region in unique_regions.copy():
-            if self.__check_if_parent_region(region):
+            if self._check_if_parent_region(region):
                 unique_regions.remove(region)
                 unique_regions.extend(self.__get_child_regions(region))
 
@@ -573,16 +640,19 @@ class mRNN(nn.Module):
         )
         return region_acts
 
-    def get_weight_subset(self, *args, W=None):
-        """Gather a subset of the weights
+    def get_weight_subset(self, *args, W: torch.Tensor = None) -> torch.Tensor:
+        """Gather a subset of the weights from all regions in args to and from
+        each other and themselves.
+
+        This should return a square matrix of all connections between regions in
+        args
 
         Args:
-            mrnn (_type_): _description_
-            start_region (_type_, optional): _description_. Defaults to None.
-            end_region (_type_, optional): _description_. Defaults to None.
+            args (str): all regions specified
+            W (torch.Tensor): use this specified weight matrix instead
 
         Returns:
-            _type_: _description_
+            torch.Tensor: subset of the total weight matrix
         """
 
         if W is None:
@@ -605,6 +675,8 @@ class mRNN(nn.Module):
         for region in args:
             if region in self.inp_dict:
                 raise Exception("Can only gather input subsets using get_projection")
+
+        args = self._ensure_order(*args)
 
         # This is used to store the final collected weight matrix
         global_weight_collection = []
@@ -629,16 +701,15 @@ class mRNN(nn.Module):
 
         return global_weight_collection
 
-    def get_projection(self, to, from_):
+    def get_projection(self, to: str, from_: str) -> torch.Tensor:
         """Gather a subset of the weights
 
         Args:
-            mrnn (_type_): _description_
-            start_region (_type_, optional): _description_. Defaults to None.
-            end_region (_type_, optional): _description_. Defaults to None.
+            to (str): Name of region that is recieving projection (row)
+            from_ (str): Name of region projecting (column)
 
         Returns:
-            _type_: _description_
+            torch.Tensor: weight matrix of from_->to projection
         """
 
         # Store regions if parent regions are given
@@ -646,13 +717,13 @@ class mRNN(nn.Module):
         from_regions = []
 
         # If to region is a parent region, then get children regions
-        if self.__check_if_parent_region(to):
-            to_regions.extend(self.__get_child_regions(to))
+        if self._check_if_parent_region(to):
+            to_regions.extend(self._get_child_regions(to))
         else:
             to_regions.append(to)
         # If from region is a parent region, then get children regions
-        if self.__check_if_parent_region(from_):
-            from_regions.extend(self.__get_child_regions(from_))
+        if self._check_if_parent_region(from_):
+            from_regions.extend(self._get_child_regions(from_))
         else:
             from_regions.append(from_)
 
@@ -694,7 +765,7 @@ class mRNN(nn.Module):
         collected_to_from_weight = torch.cat(to_from_weight, dim=0)
         return collected_to_from_weight
 
-    def get_region_indices(self, region):
+    def get_region_indices(self, region: str) -> tuple[int, int]:
         """
         Gets the start and end indices for a specific region in the hidden state vector.
 
@@ -705,7 +776,7 @@ class mRNN(nn.Module):
             tuple: (start_idx, end_idx)
         """
 
-        if self.__check_if_parent_region(region):
+        if self._check_if_parent_region(region):
             raise ValueError(
                 "Can only get indices of a single region, not parent region"
             )
@@ -732,15 +803,14 @@ class mRNN(nn.Module):
 
         return start_idx, end_idx
 
-    def get_initial_condition(self, xn):
+    def get_initial_condition(self, xn: torch.Tensor) -> torch.Tensor:
         """Create an initial xn for the network
 
         Args:
-            mrnn (_type_): _description_
-            xn (_type_): _description_
+            xn (Tensor): empty or zero tensor to hold initial condition
 
         Returns:
-            _type_: _description_
+            Tensor: tensor like xn filled with region specified initial conds
         """
         # Initialize x and h
         for region in self.region_dict:
@@ -748,7 +818,16 @@ class mRNN(nn.Module):
             xn[..., start_idx:end_idx] = self.region_dict[region].init
         return xn
 
-    def forward(self, inp, x0, h0, *args, noise=True, W_rec=None, W_inp=None):
+    def forward(
+        self,
+        inp: torch.Tensor,
+        x0: torch.Tensor,
+        h0: torch.Tensor,
+        *args,
+        noise: bool = True,
+        W_rec: torch.Tensor = None,
+        W_inp: torch.Tensor = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Run the recurrent dynamics over a sequence.
 
         Discretized update: ``x_{t+1} = x_t + alpha * (-x_t + W_rec h_t + W_inp u_t + b + noise)``
@@ -825,7 +904,6 @@ class mRNN(nn.Module):
 
         # Process sequence
         for t in range(seq_len):
-
             # Gather input at current timestep
             if self.batch_first:
                 inp_t = inp[:, t, :]
@@ -885,7 +963,7 @@ class mRNN(nn.Module):
 
         return x_final, h_final
 
-    def __create_def_values(self, config):
+    def _create_def_values(self, config: dict):
         """Generate default values for configuration
 
         Args:
@@ -907,32 +985,31 @@ class mRNN(nn.Module):
 
         # Set default values for recurrent region connections
         for connection in config["recurrent_connections"]:
-            for param in DEFAULT_REC_CONNECTIONS:
+            for param in DEFAULT_CONNECTIONS:
                 if param not in connection:
-                    connection[param] = DEFAULT_REC_CONNECTIONS[param]
+                    connection[param] = DEFAULT_CONNECTIONS[param]
 
         # Set default values for input regions
         for i, region in enumerate(config["input_regions"]):
-            for param in DEFAULT_INP_REGIONS:
+            for param in DEFAULT_REGION_BASE:
                 if param not in region:
                     if param == "name":
-                        region[param] = DEFAULT_INP_REGIONS[param] + str(i)
+                        region[param] = DEFAULT_REGION_BASE[param] + str(i)
                     else:
-                        region[param] = DEFAULT_INP_REGIONS[param]
+                        region[param] = DEFAULT_REGION_BASE[param]
 
         # Set default values for input region connections
         for connection in config["input_connections"]:
-            for param in DEFAULT_INP_CONNECTIONS:
+            for param in DEFAULT_CONNECTIONS:
                 if param not in connection:
-                    connection[param] = DEFAULT_INP_CONNECTIONS[param]
+                    connection[param] = DEFAULT_CONNECTIONS[param]
 
-    def __gen_region_mask(self, region):
+    def _gen_region_mask(self, region: str) -> torch.Tensor:
         """
         Generates a mask for a specific region and optionally a cell type.
 
         Args:
             region (str): Region name
-            cell_type (str, optional): Cell type within region. Defaults to None
 
         Returns:
             torch.Tensor: Binary mask
@@ -947,7 +1024,7 @@ class mRNN(nn.Module):
 
         return torch.cat(mask).to(self.device)
 
-    def __get_full_connectivity(self, region):
+    def _get_full_connectivity(self, region: Region):
         """
         Ensures all possible connections are defined for a region, adding zero
         connections where none are specified.
@@ -959,36 +1036,55 @@ class mRNN(nn.Module):
             if not region.has_connection_to(other_region):
                 region.add_connection(
                     dst_region_name=other_region,
-                    dst_region=self.region_dict[other_region],
+                    dst_region_units=self.region_dict[other_region].num_units,
                     sparsity=None,
                     zero_connection=True,
                 )
 
-    def __get_total_num_units(self, dict_):
+    def _get_total_num_units(self, dict_: dict) -> int:
         """
         Calculates total number of units across all regions.
+
+        Args:
+            dict_ (dict): either region_dict or inp_dict
 
         Returns:
             int: Total number of units
         """
         return sum(region.num_units for region in dict_.values())
 
-    def __check_if_parent_region(self, parent_region):
-        """Return True if any region has ``parent_region`` set to the given name."""
+    def _check_if_parent_region(self, parent_region: str) -> bool:
+        """
+        Return True if any region has ``parent_region`` set to the given name.
+
+        Args:
+            parent_region (str): name of parent region
+
+        Returns:
+            bool: whether or not parent_region is a parent region
+        """
         for region in self.region_dict.values():
             if region.parent_region == parent_region:
                 return True
         return False
 
-    def __get_child_regions(self, parent_region):
-        """Return a tuple of region names that list ``parent_region`` as their parent."""
+    def _get_child_regions(self, parent_region: str) -> tuple[str]:
+        """
+        Return a tuple of region names that list ``parent_region`` as their parent.
+
+        Args:
+            parent_region (str): name of parent region
+
+        Returns:
+            tuple: names of all child regions under parent region
+        """
         child_region_list = []
         for region in self.region_dict:
             if self.region_dict[region].parent_region == parent_region:
                 child_region_list.append(region)
         return tuple(child_region_list)
 
-    def __constrained_default_init_rec(self, weight):
+    def _constrained_default_init_rec(self, weight: torch.Tensor):
         """Default init for recurrent weights under Dale's Law constraints.
 
         Draws weights from a zero-mean normal with variance 1/(2H), then applies
@@ -998,7 +1094,7 @@ class mRNN(nn.Module):
         mask = torch.sign(weight)
         weight *= mask
 
-    def __constrained_default_init_inp(self, weight):
+    def _constrained_default_init_inp(self, weight: torch.Tensor):
         """Default init for input weights under Dale's Law constraints.
 
         Draws weights from a zero-mean normal with variance 1/(H + I), then
@@ -1011,3 +1107,7 @@ class mRNN(nn.Module):
         )
         mask = torch.sign(weight)
         weight *= mask
+
+    def _ensure_order(self, *args) -> tuple[str]:
+        """Reorder args if given regions are out of order"""
+        return tuple(r for r in self.region_dict if r in args)

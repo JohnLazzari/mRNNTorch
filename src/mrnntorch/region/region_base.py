@@ -6,13 +6,42 @@ Provides base :class:`Region` and concrete :class:`RecurrentRegion` and
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.distributions import Normal
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
-import numpy as np
-import math
-import matplotlib.pyplot as plt
-import json
+from dataclasses import dataclass, asdict
+from typing import Self
+
+DEFAULT_REGION_BASE = {"sign": "pos", "device": "cuda"}
+
+DEFAULT_REC_REGIONS = {
+    # Name of the region
+    "name": "region_",
+    # Initial condition of region (xn)
+    "init": 0,
+    # Whether connection is excitatory or inhibitory
+    "sign": "pos",
+    # bias or baseline firing of region
+    "base_firing": 0,
+    # Parent class or family region belongs to (for cell types)
+    "parent_region": None,
+    # Whether or not the base firing will be trainable
+    "learnable_bias": False,
+    # device
+    "device": "cuda",
+}
+
+DEFAULT_CONNECTIONS = {
+    # How sparse the connections will be (float from 0-1)
+    "sparsity": None,
+    # How sparse the connections will be (float from 0-1)
+    "zero_connection": False,
+}
+
+
+@dataclass
+class Connection:
+    parameter: torch.tensor | None = None
+    weight_mask: torch.tensor | None = None
+    sign_matrix: torch.tensor | None = None
+    zero_connection: torch.tensor | None = None
 
 
 class Region(nn.Module):
@@ -32,7 +61,12 @@ class Region(nn.Module):
         masks (dict): Convenience masks including "ones" and "zeros" of length ``num_units``.
     """
 
-    def __init__(self, num_units, sign="pos", device="cuda"):
+    def __init__(
+        self,
+        num_units: int,
+        sign: str = DEFAULT_REGION_BASE["sign"],
+        device: str = DEFAULT_REGION_BASE["device"],
+    ):
         """Construct a region.
 
         Args:
@@ -45,17 +79,58 @@ class Region(nn.Module):
         self.num_units = num_units
         self.sign = sign
         self.device = device
+
         self.connections = {}
         self.masks = {}
 
-        self.__generate_masks()
+        self._generate_masks()
+
+    def __setitem__(self, idx: str | int, connection: Connection):
+        """
+        Implements the assignment operator
+
+        connection_info must be of the same structure as shown in add_connection
+        Usage:
+            cur_region[idx] = new_connection_info
+        """
+        if isinstance(idx, int):
+            # Get the current indexed connection
+            connections_list = list(self.connections.keys())
+            # Assign it override connections in idx_region
+            cur_connection = connections_list[idx]
+            self.connections[cur_connection] = connection
+        elif isinstance(idx, str):
+            # Directly access connection information
+            self.connections[idx] = connection
+        else:
+            raise Exception("Improper indexing type")
+
+    def __getitem__(self, idx: str | int) -> Connection:
+        """
+        Indexes into the connection properties of region, using dict order
+
+        Usage:
+            region_sub = region[idx]
+        """
+
+        if isinstance(idx, int):
+            # Get the current indexed connection
+            connections_list = list(self.connections.keys())
+            # Assign it override connections in idx_region
+            cur_connection = connections_list[idx]
+            return self.connections[cur_connection]
+        elif isinstance(idx, str):
+            # Directly access connection information
+            return self.connections[idx]
+        else:
+            raise Exception("Improper indexing type")
 
     def add_connection(
         self,
-        dst_region_name,
-        dst_region,
-        sparsity,
-        zero_connection=False,
+        dst_region_name: str,
+        dst_region_units: int,
+        sparsity: float | None = DEFAULT_CONNECTIONS["sparsity"],
+        zero_connection: bool = DEFAULT_CONNECTIONS["zero_connection"],
     ):
         """Add a connection from this region to ``dst_region``.
 
@@ -65,7 +140,7 @@ class Region(nn.Module):
 
         Args:
             dst_region_name (str): Name of the destination region.
-            dst_region (Region): Destination region object.
+            dst_region_units (int): Number of units in destination region
             sparsity (float | None): Fraction of nonzero connections (0-1).
             zero_connection (bool): If True, registers a fixed zero connection
                 (no trainable parameters are created for this edge).
@@ -82,19 +157,17 @@ class Region(nn.Module):
         if dst_region_name in self.connections:
             if self.connections[dst_region_name]["zero_connection"] is False:
                 raise Exception("Connection is already registered as parameter")
-
         """
-        Here we will assert that users are only making connections from:
+        connections should only be made from:
             1. recurrent region -> recurrent region
             2. input region -> recurrent region
         """
-        self.__assert_projection_type(dst_region)
-        # Store all connection parameters in this dictionary
-        connection_properties = {}
+        # Store all connection parameters in this dataclass
+        connection_properties = Connection()
 
         # Initialize connection parameters
         parameter = torch.zeros(
-            size=(dst_region.num_units, self.num_units), device=self.device
+            size=(dst_region_units, self.num_units), device=self.device
         )
         # Even though parameter is zero use this specifically to zero out the weight and sign matrix if zero connection
         # This is just to be extra safe to ensure everything about this connection is zero
@@ -127,27 +200,15 @@ class Region(nn.Module):
 
         # Store weight mask and sign matrix
         # Store trainable parameter
-        connection_properties["parameter"] = parameter
-        connection_properties["weight_mask"] = weight_mask
-        connection_properties["sign_matrix"] = sign_matrix
-        connection_properties["zero_connection"] = zero_connection
+        connection_properties.parameter = parameter
+        connection_properties.weight_mask = weight_mask
+        connection_properties.sign_matrix = sign_matrix
+        connection_properties.zero_connection = zero_connection
 
         # Add all of the properties to define the connection in Region class
         self.connections[dst_region_name] = connection_properties
 
-    def __generate_masks(self):
-        """Generate reusable full and zero masks for this region."""
-        full_mask = torch.ones(size=(self.num_units,)).to(self.device)
-        zero_mask = torch.zeros(size=(self.num_units,)).to(self.device)
-
-        self.masks["ones"] = full_mask
-        self.masks["zeros"] = zero_mask
-
-    def __assert_projection_type(self, dst_region):
-        """Ensure that projections only target recurrent regions."""
-        assert isinstance(dst_region, RecurrentRegion)
-
-    def has_connection_to(self, region):
+    def has_connection_to(self, region: str) -> bool:
         """
         Checks if there is a connection from the current region to the specified region.
 
@@ -158,57 +219,10 @@ class Region(nn.Module):
         """
         return region in self.connections
 
+    def _generate_masks(self):
+        """Generate reusable full and zero masks for this region."""
+        full_mask = torch.ones(size=(self.num_units,)).to(self.device)
+        zero_mask = torch.zeros(size=(self.num_units,)).to(self.device)
 
-#############################################################################################################
-# Recurrent Region
-
-
-class RecurrentRegion(Region):
-    def __init__(
-        self,
-        num_units,
-        base_firing,
-        init,
-        sign="pos",
-        device="cuda",
-        parent_region=None,
-        learnable_bias=False,
-    ):
-        super(RecurrentRegion, self).__init__(num_units, sign=sign, device=device)
-        """Recurrent region (inherits from :class:`Region`).
-
-        Args:
-            num_units (int): Number of units in the region.
-            base_firing (float): Baseline firing for each unit.
-            init (float): Initial pre-activation value for units.
-            sign (str): "pos" or "neg" indicating excitatory/inhibitory outputs.
-            device (str): Torch device string.
-            parent_region (str | None): Optional parent identifier.
-            learnable_bias (bool): If True, make ``base_firing`` a trainable parameter.
-        """
-
-        self.init = init * torch.ones(size=(self.num_units,))
-        self.learnable_bias = learnable_bias
-        self.parent_region = parent_region
-
-        if learnable_bias is True:
-            self.base_firing = nn.Parameter(base_firing * torch.ones(size=(num_units,)))
-        else:
-            self.base_firing = base_firing * torch.ones(size=(num_units,))
-
-
-#############################################################################################################
-# Input Region
-
-
-class InputRegion(Region):
-    def __init__(self, num_units, sign="pos", device="cuda"):
-        # Implements base region class
-        super(InputRegion, self).__init__(num_units, sign=sign, device=device)
-        """Input region (inherits from :class:`Region`).
-
-        Args:
-            num_units (int): Number of input channels.
-            sign (str): "pos" or "neg" indicating sign mask for inputs.
-            device (str): Torch device string.
-        """
+        self.masks["ones"] = full_mask
+        self.masks["zeros"] = zero_mask
