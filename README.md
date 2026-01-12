@@ -1,5 +1,7 @@
 ![mRNNTorch banner](assets/banner.svg)
 
+[![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://mrnntorch.readthedocs.io/en/main/)
+
 mRNNTorch is a small Python package for building and analyzing multi-regional recurrent neural networks (mRNNs) in PyTorch. The `mRNN` module mirrors `torch.nn.RNN` usage while managing region-level connectivity, masks, and constraints so you can prototype quickly.
 
 ## Highlights
