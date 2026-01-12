@@ -1,20 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80" role="img">
-  <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#5b8def"/>
-      <stop offset="100%" stop-color="#7bd389"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="320" height="80" rx="14" fill="#0b1220"/>
-  <g transform="translate(16,16)">
-    <circle cx="28" cy="24" r="8" fill="url(#g)"/>
-    <circle cx="64" cy="24" r="8" fill="url(#g)"/>
-    <circle cx="100" cy="24" r="8" fill="url(#g)"/>
-    <circle cx="136" cy="24" r="8" fill="url(#g)"/>
-    <path d="M28,24 L64,24 L100,24 L136,24" stroke="#7bd389" stroke-width="2" fill="none" opacity="0.7"/>
-  </g>
-  <text x="160" y="50" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="28" fill="url(#g)">
-    mRNNTorch
-  </text>
-</svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400">
+  <rect width="100%" height="100%" fill="white"/>
 
+  <g>
+    <text x="731.00" y="242.00"
+          text-anchor="middle"
+          font-family="SF Pro Display, SF Pro Text, -apple-system, BlinkMacSystemFont, Helvetica Neue, Helvetica, Arial, sans-serif"
+          font-size="120"
+          font-weight="800"
+          letter-spacing="0.5"
+          fill="#2563EB">
+      mRNNTorch
+    </text>
+
+    <g transform="translate(1083.80,140.00) scale(5.0000)">
+      <path d="M12.005.04l-7.03 7.03a9.832 9.832 0 0 0 0 13.975 9.833 9.833 0 0 0 13.976 0c3.97-3.887 3.972-10.171.084-13.976l-1.738 1.737c2.895 2.895 2.895 7.608 0 10.503-2.894 2.894-7.608 2.894-10.503 0C3.9 16.414 3.9 11.7 6.794 8.806l4.632-4.631.58-.663zm3.556 3.886a1.323 1.323 0 0 0-1.323 1.323 1.323 1.323 0 0 0 1.323 1.323 1.323 1.323 0 0 0 1.323-1.323 1.323 1.323 0 0 0-1.323-1.323z" fill="#2563EB"/>
+    </g>
+  </g>
+</svg>

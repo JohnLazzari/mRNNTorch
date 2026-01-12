@@ -1,9 +1,8 @@
 import os
 import sys
-import types
 
-# Add repository root to Python path for autodoc
-sys.path.insert(0, os.path.abspath(".."))
+# Add repository src root to Python path for autodoc
+sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 
@@ -26,22 +25,8 @@ autodoc_mock_imports = [
     "numpy",
     "matplotlib",
     "sklearn",
+    "tqdm",
 ]
-
-# Stub package path used in code to avoid import errors during autodoc
-# The repository currently keeps modules at the root, while code imports
-# from "mRNNTorch.Region". Create a minimal stub to satisfy the import.
-m_pkg = types.ModuleType("mRNNTorch")
-m_region = types.ModuleType("mRNNTorch.Region")
-
-class _Stub:  # minimal placeholders for class names used at import time
-    pass
-
-m_region.RecurrentRegion = _Stub
-m_region.InputRegion = _Stub
-
-sys.modules.setdefault("mRNNTorch", m_pkg)
-sys.modules.setdefault("mRNNTorch.Region", m_region)
 
 templates_path = ["_templates"]
 exclude_patterns = []

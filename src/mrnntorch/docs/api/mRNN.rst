@@ -1,8 +1,7 @@
 ``mRNN`` Module
 ================
 
-.. automodule:: mRNN
+.. automodule:: mrnntorch.mRNN
    :members:
    :undoc-members:
    :show-inheritance:
-

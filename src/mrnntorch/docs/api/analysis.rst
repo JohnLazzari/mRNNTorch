@@ -1,8 +1,11 @@
-``analysis`` Module
-===================
+Analysis Modules
+================
 
-.. automodule:: analysis
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. toctree::
+   :maxdepth: 1
 
+   analysis_flow_field
+   analysis_flow_field_finder
+   analysis_fixed_points
+   analysis_fp_finder
+   analysis_linearization

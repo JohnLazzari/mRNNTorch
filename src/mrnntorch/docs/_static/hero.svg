@@ -1,24 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#0b1220"/>
-      <stop offset="100%" stop-color="#111827"/>
-    </linearGradient>
-    <linearGradient id="c" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5b8def"/>
-      <stop offset="100%" stop-color="#7bd389"/>
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="300" fill="url(#bg)"/>
-  <g opacity="0.2">
-    <circle cx="150" cy="150" r="100" fill="url(#c)"/>
-    <circle cx="350" cy="120" r="80" fill="url(#c)"/>
-    <circle cx="550" cy="180" r="90" fill="url(#c)"/>
-    <circle cx="780" cy="140" r="110" fill="url(#c)"/>
-    <circle cx="1000" cy="170" r="85" fill="url(#c)"/>
-  </g>
-  <text x="600" y="170" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="44" fill="#cfe8ff">
-    Multi-Regional Recurrent Neural Networks in PyTorch
-  </text>
-</svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1600 400" role="img">
+  <rect width="100%" height="100%" fill="white"/>
 
+  <g>
+    <text x="731.00" y="242.00"
+          text-anchor="middle"
+          font-family="SF Pro Display, SF Pro Text, -apple-system, BlinkMacSystemFont, Helvetica Neue, Helvetica, Arial, sans-serif"
+          font-size="120"
+          font-weight="800"
+          letter-spacing="0.5"
+          fill="#2563EB">
+      mRNNTorch
+    </text>
+
+    <g transform="translate(1083.80,140.00) scale(5.0000)">
+      <path d="M12.005.04l-7.03 7.03a9.832 9.832 0 0 0 0 13.975 9.833 9.833 0 0 0 13.976 0c3.97-3.887 3.972-10.171.084-13.976l-1.738 1.737c2.895 2.895 2.895 7.608 0 10.503-2.894 2.894-7.608 2.894-10.503 0C3.9 16.414 3.9 11.7 6.794 8.806l4.632-4.631.58-.663zm3.556 3.886a1.323 1.323 0 0 0-1.323 1.323 1.323 1.323 0 0 0 1.323 1.323 1.323 1.323 0 0 0 1.323-1.323 1.323 1.323 0 0 0-1.323-1.323z" fill="#2563EB"/>
+    </g>
+  </g>
+</svg>

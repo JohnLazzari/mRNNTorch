@@ -1,8 +1,9 @@
-``Region`` Module
-=================
+Region Modules
+==============
 
-.. automodule:: Region
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. toctree::
+   :maxdepth: 1
 
+   region_base
+   recurrent_region
+   input_region
