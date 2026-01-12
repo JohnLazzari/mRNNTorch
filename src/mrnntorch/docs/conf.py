@@ -3,7 +3,7 @@ import sys
 
 # Add repository src root to Python path for autodoc
 _CONF_DIR = os.path.abspath(os.path.dirname(__file__))
-_SRC_DIR = os.path.abspath(os.path.join(_CONF_DIR, "../.."))
+_SRC_DIR = os.path.abspath(os.path.join(_CONF_DIR, "../../.."))
 sys.path.insert(0, _SRC_DIR)
 
 # -- Project information -----------------------------------------------------
