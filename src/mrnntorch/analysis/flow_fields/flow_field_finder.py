@@ -86,8 +86,16 @@ class FlowFieldFinder:
         else:
             time_dim = 0
 
+        if states.dim() == 1:
+            states = states.unsqueeze(0)
+
+        if inp.dim() == 1:
+            inp = inp.unsqueeze(0)
+
         states = torch.flatten(states, end_dim=-2)
         inp = torch.flatten(inp, end_dim=-2)
+
+        assert states.shape[0] == inp.shape[0]
         n_states = states.shape[0]
 
         if stim_input is not None:

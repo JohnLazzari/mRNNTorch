@@ -848,6 +848,10 @@ class mRNN(nn.Module):
         """
         assert len(self.region_dict) > 0
         assert len(self.inp_dict) > 0
+        assert self.rec_finalized or self.inp_finalized, (
+            "Recurrent or input weights are not finalized, \
+            call finalize_connectivity() in your custom model definition"
+        )
 
         if inp.dim() != 3:
             raise Exception(
