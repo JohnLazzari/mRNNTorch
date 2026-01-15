@@ -894,17 +894,28 @@ class mRNN(nn.Module):
         xn_next = x0
         hn_next = h0
 
-        # Create lists for xs and hns
-        new_hs = []
-        new_xs = []
-
         if self.batch_first:
             # If batch first then batch is first dim of inp
             seq_len = inp.shape[1]
             batch_shape = inp.shape[0]
+            # Create lists for xs and hns
+            new_hs = torch.empty(
+                size=(batch_shape, seq_len, self.total_num_units), device=self.device
+            )
+            new_xs = torch.empty(
+                size=(batch_shape, seq_len, self.total_num_units), device=self.device
+            )
+
         else:
             seq_len = inp.shape[0]
             batch_shape = inp.shape[1]
+            # Create lists for xs and hns
+            new_hs = torch.empty(
+                size=(seq_len, batch_shape, self.total_num_units), device=self.device
+            )
+            new_xs = torch.empty(
+                size=(seq_len, batch_shape, self.total_num_units), device=self.device
+            )
 
         # Process sequence
         for t in range(seq_len):
@@ -954,18 +965,15 @@ class mRNN(nn.Module):
             # Gather activation and pre-activation into lists
             # Activation of the form: h_t = sigma(x_t)
             hn_next = self.activation(xn_next)
-            new_xs.append(xn_next)
-            new_hs.append(hn_next)
 
-        # Correct the final output sizes based on input shape
-        if self.batch_first:
-            x_final = torch.stack(new_xs, dim=1)
-            h_final = torch.stack(new_hs, dim=1)
-        else:
-            x_final = torch.stack(new_xs, dim=0)
-            h_final = torch.stack(new_hs, dim=0)
+            if self.batch_first:
+                new_xs[:, t, :] = xn_next
+                new_hs[:, t, :] = hn_next
+            else:
+                new_xs[t, :, :] = xn_next
+                new_hs[t, :, :] = hn_next
 
-        return x_final, h_final
+        return new_xs, new_hs
 
     def _create_def_values(self, config: dict):
         """Generate default values for configuration
@@ -1104,7 +1112,7 @@ class mRNN(nn.Module):
         Draws weights from a zero-mean normal with variance 1/(H + I), then
         applies a sign mask to respect region sign.
         """
-        nn.init.torch.normal_(
+        nn.init.normal_(
             weight,
             mean=0,
             std=np.sqrt(1 / (self.total_num_units + self.total_num_inputs)),
