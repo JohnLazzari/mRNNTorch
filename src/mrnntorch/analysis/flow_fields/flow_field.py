@@ -25,10 +25,10 @@ class FlowField:
             state_size (int): dimensions of state in grid
         """
         # Flow storage
-        self.x_vels = x_vels
-        self.y_vels = y_vels
-        self.speeds = speeds
-        self.grid = grid
+        self.x_vels = x_vels.clone()
+        self.y_vels = y_vels.clone()
+        self.speeds = speeds.clone()
+        self.grid = grid.clone()
 
         # Assert appropriate shapes
         assert self.speeds.dim() == 2
@@ -67,7 +67,7 @@ class FlowField:
             four possible ways to index: 
                 flow[n], flow[:, n], flow[n, :], flow[n, n]
             """
-            kwargs[attr_name] = idx_attr_val
+            kwargs[attr_name] = idx_attr_val.clone()
         return type(self)(**kwargs)
 
     def __len__(self) -> int:
