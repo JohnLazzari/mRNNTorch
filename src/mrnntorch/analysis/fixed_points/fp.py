@@ -116,13 +116,13 @@ class FixedPointCollection:
             self.n_inputs = None
 
         # Common FP attributes
-        self.xstar = xstar
-        self.x_init = x_init
-        self.inputs = inputs
-        self.F_xstar = F_xstar
-        self.qstar = qstar
-        self.dq = dq
-        self.n_iters = n_iters
+        self.xstar = xstar.clone()
+        self.x_init = x_init.clone() if x_init is not None else x_init
+        self.inputs = inputs.clone() if inputs is not None else inputs
+        self.F_xstar = F_xstar.clone() if F_xstar is not None else F_xstar
+        self.qstar = qstar.clone() if qstar is not None else qstar
+        self.dq = dq.clone() if dq is not None else dq
+        self.n_iters = n_iters.clone() if n_iters is not None else n_iters
 
         self.assert_valid_shapes()
 
@@ -176,7 +176,9 @@ class FixedPointCollection:
         for attr_name in self._data_attrs_fp:
             attr_val = getattr(self, attr_name)
             indexed_val = self._safe_index(attr_val, index)
-            kwargs[attr_name] = indexed_val
+            kwargs[attr_name] = (
+                indexed_val.clone() if indexed_val is not None else indexed_val
+            )
         return type(self)(**kwargs)
 
     def __len__(self) -> int:

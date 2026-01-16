@@ -24,10 +24,14 @@ extensions = [
 # Mock heavy deps so autodoc works on Read the Docs
 autodoc_mock_imports = [
     "torch",
+    "torch.nn",
+    "torch.nn.functional",
     "numpy",
     "matplotlib",
     "sklearn",
+    "sklearn.decomposition",
     "tqdm",
+    "tqdm.auto",
 ]
 
 templates_path = ["_templates"]

@@ -682,6 +682,8 @@ class FixedPointFinder:
         if not args:
             args = list(self.mrnn.region_dict.keys())
 
+        ext_inp.requires_grad = False
+
         # Gather all of the regions to concatenate during training
         # Get them region by region for proper optimization
         region_tensor_list = []
