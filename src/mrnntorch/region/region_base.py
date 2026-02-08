@@ -38,10 +38,10 @@ DEFAULT_CONNECTIONS = {
 
 @dataclass
 class Connection:
-    parameter: torch.tensor | None = None
-    weight_mask: torch.tensor | None = None
-    sign_matrix: torch.tensor | None = None
-    zero_connection: torch.tensor | None = None
+    parameter: torch.Tensor | None = None
+    weight_mask: torch.Tensor | None = None
+    sign_matrix: torch.Tensor | None = None
+    zero_connection: torch.Tensor | None = None
 
 
 class Region(nn.Module):
