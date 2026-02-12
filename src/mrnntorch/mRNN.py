@@ -222,8 +222,7 @@ class mRNN(nn.Module):
                     self.finalize_inp_connectivity()
 
     def __setitem__(self, idx: str, region: RecurrentRegion | InputRegion):
-        """
-        Assign a recurrent region or input region to a valid index in mRNN
+        """Assign a recurrent region or input region to a valid index in mRNN
 
         Args:
             idx (str): an input or recurrent region in the mRNN
@@ -556,7 +555,8 @@ class mRNN(nn.Module):
         """
         return W_rec_mask * torch.abs(W_rec) * W_rec_sign_matrix
 
-    def get_tonic_inp(self):
+    @property
+    def tonic_inp(self):
         """
         Collects baseline firing rates for all regions.
 
@@ -803,20 +803,16 @@ class mRNN(nn.Module):
 
         return start_idx, end_idx
 
-    def get_initial_condition(self, xn: torch.Tensor) -> torch.Tensor:
+    @property
+    def initial_condition(self) -> torch.Tensor:
         """Create an initial xn for the network
-
-        Args:
-            xn (Tensor): empty or zero tensor to hold initial condition
 
         Returns:
             Tensor: tensor like xn filled with region specified initial conds
         """
-        # Initialize x and h
-        for region in self.region_dict:
-            start_idx, end_idx = self.get_region_indices(region)
-            xn[..., start_idx:end_idx] = self.region_dict[region].init
-        return xn
+        return torch.cat([region.init for region in self.region_dict.values()]).to(
+            self.device
+        )
 
     def forward(
         self,
