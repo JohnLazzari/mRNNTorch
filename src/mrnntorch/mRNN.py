@@ -417,7 +417,7 @@ class mRNN(nn.Module):
             nn.init.xavier_normal_(weight)
 
     def set_spectral_radius(
-        self, W: torch.Tensor, W_tmp: torch.Tensor = None
+        self, W: torch.Tensor, W_tmp: torch.Tensor | None = None
     ) -> torch.Tensor:
         """Scale recurrent weights so their spectral radius matches ``self.spectral_radius``.
 
@@ -623,7 +623,7 @@ class mRNN(nn.Module):
         for region in unique_regions.copy():
             if self._check_if_parent_region(region):
                 unique_regions.remove(region)
-                unique_regions.extend(self.__get_child_regions(region))
+                unique_regions.extend(self._get_child_regions(region))
 
         # collect all necessary indices now
         region_indices = {
@@ -640,7 +640,7 @@ class mRNN(nn.Module):
         )
         return region_acts
 
-    def get_weight_subset(self, *args, W: torch.Tensor = None) -> torch.Tensor:
+    def get_weight_subset(self, *args, W: torch.Tensor | None = None) -> torch.Tensor:
         """Gather a subset of the weights from all regions in args to and from
         each other and themselves.
 
@@ -825,8 +825,8 @@ class mRNN(nn.Module):
         h0: torch.Tensor,
         *args,
         noise: bool = True,
-        W_rec: torch.Tensor = None,
-        W_inp: torch.Tensor = None,
+        W_rec: torch.Tensor | None = None,
+        W_inp: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Run the recurrent dynamics over a sequence.
 
