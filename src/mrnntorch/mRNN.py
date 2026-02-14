@@ -885,7 +885,7 @@ class mRNN(nn.Module):
             if W_inp.dtype != x0.dtype:
                 W_inp = W_inp.to(x0.dtype)
 
-        baseline_inp = self.get_tonic_inp()
+        baseline_inp = self.tonic_inp
 
         xn_next = x0
         hn_next = h0

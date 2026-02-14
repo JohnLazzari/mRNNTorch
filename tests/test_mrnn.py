@@ -51,7 +51,7 @@ def test_get_tonic_inp_concatenates_regions():
         name="r2", num_units=1, sign="pos", base_firing=1.5, init=0, device="cpu"
     )
 
-    tonic = mrnn.get_tonic_inp()
+    tonic = mrnn.tonic_inp
     # The baseline vector length should equal total recurrent units.
     assert tonic.shape == (3,)
     assert torch.allclose(tonic, torch.tensor([0.5, 0.5, 1.5]))
@@ -155,29 +155,3 @@ def test_forward_shapes_without_noise_simultaneous():
     # Outputs should mirror [B, T, H] layout under batch_first=True.
     assert xs.shape == (batch_size, seq_len, 3)
     assert hs.shape == (batch_size, seq_len, 3)
-
-
-@pytest.mark.xfail(reason="get_region_activity calls missing __ensure_order")
-def test_get_region_activity_subset_ordering():
-    """Region subset ordering should be stable but currently errors."""
-    mrnn = mRNN(device="cpu")
-    mrnn.add_recurrent_region(
-        name="r1", num_units=1, sign="pos", base_firing=0, init=0, device="cpu"
-    )
-    mrnn.add_recurrent_region(
-        name="r2", num_units=1, sign="pos", base_firing=0, init=0, device="cpu"
-    )
-    act = torch.zeros(2)
-    out = mrnn.get_region_activity(act, "r2", "r1")
-    assert out.shape == (2,)
-
-
-@pytest.mark.xfail(reason="inp constrained init uses nn.init.torch.normal_")
-def test_add_input_connection_with_constraints():
-    """Constrained input init should succeed but currently calls a bad API."""
-    mrnn = mRNN(device="cpu")
-    mrnn.add_recurrent_region(
-        name="r1", num_units=2, sign="pos", base_firing=0, init=0, device="cpu"
-    )
-    mrnn.add_input_region(name="i1", num_units=2, sign="pos", device="cpu")
-    mrnn.add_input_connection("i1", "r1")

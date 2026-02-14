@@ -5,6 +5,7 @@ from typing import Tuple
 
 def unit_vector(vector: torch.Tensor) -> torch.Tensor:
     """Returns the unit vector of the vector."""
+    assert torch.linalg.norm(vector) != 0.0
     return vector / torch.linalg.norm(vector)
 
 
@@ -37,6 +38,7 @@ def line_attractor_score(
     Returns:
         float: Calculated line attractor score.
     """
+    assert lambda_1 != 1, "Value of lamda 1 cannot be exactly 1"
     lambd_1_dist = abs(1 - lambda_1)
     lambd_2_dist = abs(1 - lambda_2)
     tau_1 = tau / lambd_1_dist
@@ -66,6 +68,6 @@ def orthogonalize(v1: torch.Tensor, *args) -> Tuple[torch.Tensor, ...]:
     for v in args:
         sub_projection = v.clone()
         projections = [projection(v, orth_vec) for orth_vec in orth_vecs]
-        sub_projection = projections[0] - torch.stack(projections[1:]).sum(dim=0)
+        sub_projection -= torch.stack(projections).sum(dim=0)
         orth_vecs = (*orth_vecs, sub_projection)
     return orth_vecs
