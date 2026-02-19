@@ -1,83 +1,172 @@
-
-
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" data-content_root="./">
+<html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>fp &mdash; mRNNTorch 0.0.1 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
-
-  
-      <script src="_static/jquery.js?v=5d32c60e"></script>
-      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=d45e8c67"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script src="_static/js/theme.js"></script>
-    <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
-</head>
-
-<body class="wy-body-for-nav"> 
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-
-          
-          
-          <a href="index.html" class="icon icon-home">
-            mRNNTorch
-          </a>
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>fp - mRNNTorch 0.0.1 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="flow_field" href="mrnntorch.analysis.flow_fields.html" /><link rel="prev" title="fixed_points" href="mrnntorch.analysis.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=44020203" />
+    <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    <meta property="og:type" content="website"/><meta property="og:title" content="fp"/>
+    <meta name="twitter:card" content="summary"/>
+  </head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="index.html">
+      
+      
+      <strong>mRNNTorch</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials"></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
 </div>
-        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-<li class="toctree-l1"><a class="reference internal" href="mrnntorch.html">mrnntorch</a></li>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="0"><ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="mrnntorch.html">mrnntorch</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.region.html">input_region</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.region.html#module-mrnntorch.region.recurrent_region">recurrent_region</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.region.html#module-mrnntorch.region.region_base">region_base</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="mrnntorch.analysis.html">fixed_points</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">fp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-mrnntorch.analysis.fixed_points.fp_finder">fp_finder</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.analysis.html#flow-fields">flow_fields</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.flow_fields.html">flow_field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.flow_fields.html#module-mrnntorch.analysis.flow_fields.flow_field_finder">flow_field_finder</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.analysis.html#linear">linear</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.linear.html">linearization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.analysis.html#module-mrnntorch.analysis.utils">utils</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
       </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="index.html">mRNNTorch</a>
-      </nav>
-
-      <div class="wy-nav-content">
-        <div class="rst-content">
-          <div role="navigation" aria-label="Page navigation">
-  <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">fp</li>
-      <li class="wy-breadcrumbs-aside">
-            <a href="_sources/mrnntorch.analysis.fixed_points.rst.txt" rel="nofollow"> View page source</a>
-      </li>
-  </ul>
-  <hr/>
-</div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
-             
-  <section id="module-mrnntorch.analysis.fixed_points.fp">
-<span id="fp"></span><h1>fp<a class="headerlink" href="#module-mrnntorch.analysis.fixed_points.fp" title="Link to this heading"></a></h1>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
+<li><a class="reference internal" href="#">fp</a><ul>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><code class="docutils literal notranslate"><span class="pre">FixedPointCollection</span></code></a><ul>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.assert_valid_shapes"><code class="docutils literal notranslate">.assert_valid_shapes()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.concatenate"><code class="docutils literal notranslate">.concatenate()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.find"><code class="docutils literal notranslate">.find()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.get_unique"><code class="docutils literal notranslate">.get_unique()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.is_single_fixed_point"><code class="docutils literal notranslate">.is_single_fixed_point</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.kwargs"><code class="docutils literal notranslate">.kwargs</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.restore"><code class="docutils literal notranslate">.restore()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.save"><code class="docutils literal notranslate">.save()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.transform"><code class="docutils literal notranslate">.transform()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.update"><code class="docutils literal notranslate">.update()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-mrnntorch.analysis.fixed_points.fp_finder">fp_finder</a><ul>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder"><code class="docutils literal notranslate"><span class="pre">FixedPointFinder</span></code></a><ul>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.decompose_jacobian"><code class="docutils literal notranslate">.decompose_jacobian()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.default_hps"><code class="docutils literal notranslate">.default_hps()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.find_fixed_points"><code class="docutils literal notranslate">.find_fixed_points()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_fp_non_distance_outliers"><code class="docutils literal notranslate">.get_fp_non_distance_outliers()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_init_non_distance_outliers"><code class="docutils literal notranslate">.get_init_non_distance_outliers()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_jacobian"><code class="docutils literal notranslate">.get_jacobian()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_non_outliers"><code class="docutils literal notranslate">.identify_q_non_outliers()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_outliers"><code class="docutils literal notranslate">.identify_q_outliers()</span></code></a></li>
+<li><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.sample_states"><code class="docutils literal notranslate">.sample_states()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="index.html"><span itemprop="name">mRNNTorch</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="mrnntorch.html"><span itemprop="name">mrnntorch</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="2" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="mrnntorch.analysis.html"><span itemprop="name">fixed_points</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="3" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">fp</strong>
+        <meta itemprop="position" content="4" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  <article class="yue" role="main">
+          <section id="module-mrnntorch.analysis.fixed_points.fp">
+<span id="fp"></span><h1>fp<a class="headerlink" href="#module-mrnntorch.analysis.fixed_points.fp" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mrnntorch.analysis.fixed_points.fp.</span></span><span class="sig-name descname"><span class="pre">FixedPointCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xstar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_init</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">F_xstar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qstar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.float32</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype_complex</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">complex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.complex64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mrnntorch.analysis.fixed_points.fp.</span></span><span class="sig-name descname"><span class="pre">FixedPointCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xstar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_init</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">F_xstar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qstar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.float32</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype_complex</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">complex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.complex64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>A class for storing fixed points and associated data.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.assert_valid_shapes">
-<span class="sig-name descname"><span class="pre">assert_valid_shapes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.assert_valid_shapes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.assert_valid_shapes" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">assert_valid_shapes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.assert_valid_shapes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.assert_valid_shapes" title="Link to this definition">¶</a></dt>
 <dd><p>Checks that all data attributes reflect the same number of fixed
 points.</p>
 <dl class="simple">
@@ -89,7 +178,7 @@ points.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.concatenate">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">concatenate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps_seq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.concatenate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.concatenate" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">concatenate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps_seq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.concatenate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.concatenate" title="Link to this definition">¶</a></dt>
 <dd><p>Join a sequence of FixedPoints objects.</p>
 <dl>
 <dt>Args:</dt><dd><p>fps_seq: sequence of FixedPoints objects. All FixedPoints objects
@@ -106,7 +195,7 @@ n_inputs</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.find">
-<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.find"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.find" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.find"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.find" title="Link to this definition">¶</a></dt>
 <dd><p>Searches in the current FixedPoints object for matches to a
 specified fixed point. Two fixed points are defined as matching
 if the 2-norm of the difference between their concatenated (xstar,
@@ -122,7 +211,7 @@ FixedPoints object where matches to fp were found.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.get_unique">
-<span class="sig-name descname"><span class="pre">get_unique</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Self</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.get_unique"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.get_unique" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">get_unique</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Self</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.get_unique"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.get_unique" title="Link to this definition">¶</a></dt>
 <dd><p>Identifies unique fixed points. Among duplicates identified,
 this keeps the one with smallest qstar.</p>
 <dl class="simple">
@@ -136,12 +225,12 @@ their associated data. Uniqueness is determined down to tol_unique.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.is_single_fixed_point">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_single_fixed_point</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.is_single_fixed_point" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_single_fixed_point</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.is_single_fixed_point" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.kwargs">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">kwargs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span></em><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.kwargs" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">kwargs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span></em><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.kwargs" title="Link to this definition">¶</a></dt>
 <dd><p>Returns dict of keyword arguments necessary for reinstantiating a
 (shallow) copy of this FixedPoints object, i.e.,</p>
 <p>fp_copy  = FixedPoints(<a href="#id1"><span class="problematic" id="id2">**</span></a>fp.kwargs)</p>
@@ -149,7 +238,7 @@ their associated data. Uniqueness is determined down to tol_unique.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.restore">
-<span class="sig-name descname"><span class="pre">restore</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">restore_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.restore"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.restore" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">restore</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">restore_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.restore"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.restore" title="Link to this definition">¶</a></dt>
 <dd><p>Restores data from a previously saved FixedPoints object.</p>
 <dl class="simple">
 <dt>Args:</dt><dd><p>restore_path: A string containing the path at which to find a
@@ -163,7 +252,7 @@ and extension).</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.save">
-<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">save_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.save" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">save_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.save" title="Link to this definition">¶</a></dt>
 <dd><p>Saves all data contained in the FixedPoints object.</p>
 <dl class="simple">
 <dt>Args:</dt><dd><p>save_path: A string containing the path at which to save
@@ -176,7 +265,7 @@ and extension).</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.transform">
-<span class="sig-name descname"><span class="pre">transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">U</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Self</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.transform" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">U</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Self</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.transform" title="Link to this definition">¶</a></dt>
 <dd><p>Apply an affine transformation to the state-space representation.
 This may be helpful for plotting fixed points in a given linear
 subspace (e.g., PCA or an RNN readout space).</p>
@@ -191,7 +280,7 @@ subspace (e.g., PCA or an RNN readout space).</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp.FixedPointCollection.update">
-<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.update" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp.html#FixedPointCollection.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection.update" title="Link to this definition">¶</a></dt>
 <dd><p>Combines the entries from another FixedPoints object into this
 object.</p>
 <dl>
@@ -213,20 +302,20 @@ FixedPoints objects (especially relevant for decomposed Jacobians).</p>
 
 </section>
 <section id="module-mrnntorch.analysis.fixed_points.fp_finder">
-<span id="fp-finder"></span><h1>fp_finder<a class="headerlink" href="#module-mrnntorch.analysis.fixed_points.fp_finder" title="Link to this heading"></a></h1>
+<span id="fp-finder"></span><h1>fp_finder<a class="headerlink" href="#module-mrnntorch.analysis.fixed_points.fp_finder" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mrnntorch.analysis.fixed_points.fp_finder.</span></span><span class="sig-name descname"><span class="pre">FixedPointFinder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mrnn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="mrnntorch.html#mrnntorch.mRNN.mRNN" title="mrnntorch.mRNN.mRNN"><span class="pre">mRNN</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_init</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_patience</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_cooldown</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_q</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_dq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_rerun_q_outliers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_q_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_exclude_distance_outliers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_distance_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_n_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'float32'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">super_verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iters_per_print_update</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mrnntorch.analysis.fixed_points.fp_finder.</span></span><span class="sig-name descname"><span class="pre">FixedPointFinder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mrnn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="mrnntorch.html#mrnntorch.mRNN.mRNN" title="mrnntorch.mRNN.mRNN"><span class="pre">mRNN</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_init</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_patience</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_cooldown</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_q</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_dq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_rerun_q_outliers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_q_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_exclude_distance_outliers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_distance_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_n_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'float32'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">super_verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iters_per_print_update</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.decompose_jacobian">
-<span class="sig-name descname"><span class="pre">decompose_jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.decompose_jacobian"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.decompose_jacobian" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">decompose_jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.decompose_jacobian"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.decompose_jacobian" title="Link to this definition">¶</a></dt>
 <dd><p>Wrapper around linearization object decomposition for current fixed points</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.default_hps">
-<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">default_hps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.default_hps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.default_hps" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">default_hps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.default_hps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.default_hps" title="Link to this definition">¶</a></dt>
 <dd><p>Returns a deep copy of the default hyperparameters dict.</p>
 <p>The deep copy protects against external updates to the defaults, which
 in turn protects against unintended interactions with the hashing done
@@ -241,7 +330,7 @@ by the Hyperparameters class.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.find_fixed_points">
-<span class="sig-name descname"><span class="pre">find_fixed_points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ext_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stim_inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_rec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_rounds_q_opt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.find_fixed_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.find_fixed_points" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">find_fixed_points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ext_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stim_inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_rec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_rounds_q_opt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.find_fixed_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.find_fixed_points" title="Link to this definition">¶</a></dt>
 <dd><p>Finds RNN fixed points and the Jacobians at the fixed points.</p>
 <dl>
 <dt>Args:</dt><dd><p>initial_states: Tensor specifying the initial
@@ -273,7 +362,7 @@ unique_fps).</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_fp_non_distance_outliers">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_fp_non_distance_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.get_fp_non_distance_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_fp_non_distance_outliers" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_fp_non_distance_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.get_fp_non_distance_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_fp_non_distance_outliers" title="Link to this definition">¶</a></dt>
 <dd><p>get fixed points that are far from initial states based on threshold.
 Args:</p>
 <blockquote>
@@ -289,7 +378,7 @@ dist_thresh (float): threshold at which fixed points are considered far</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_init_non_distance_outliers">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_init_non_distance_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.get_init_non_distance_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_init_non_distance_outliers" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_init_non_distance_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.get_init_non_distance_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_init_non_distance_outliers" title="Link to this definition">¶</a></dt>
 <dd><p>get initial states that are far from centroid based on threshold.
 Args:</p>
 <blockquote>
@@ -304,13 +393,13 @@ dist_thresh (float): Threshold from initial states which is far.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_jacobian">
-<span class="sig-name descname"><span class="pre">get_jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.get_jacobian"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_jacobian" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">get_jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.get_jacobian"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.get_jacobian" title="Link to this definition">¶</a></dt>
 <dd><p>Wrapper around linearization object jacobian for current fixed points</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_non_outliers">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">identify_q_non_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.identify_q_non_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_non_outliers" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">identify_q_non_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.identify_q_non_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_non_outliers" title="Link to this definition">¶</a></dt>
 <dd><p>Identify fixed points with optimized q values that do not exceed a
 specified threshold.</p>
 <dl>
@@ -330,7 +419,7 @@ non_outlier_fps = fps[idx]</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_outliers">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">identify_q_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.identify_q_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_outliers" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">identify_q_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#mrnntorch.analysis.fixed_points.fp.FixedPointCollection" title="mrnntorch.analysis.fixed_points.fp.FixedPointCollection"><span class="pre">FixedPointCollection</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_thresh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.identify_q_outliers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.identify_q_outliers" title="Link to this definition">¶</a></dt>
 <dd><p>Identify fixed points with optimized q values that exceed a
 specified threshold.</p>
 <dl>
@@ -350,7 +439,7 @@ outlier_fps = fps[idx]</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.sample_states">
-<span class="sig-name descname"><span class="pre">sample_states</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_traj</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_inits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_zero_tensors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.sample_states"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.sample_states" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">sample_states</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_traj</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_inits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_zero_tensors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/fixed_points/fp_finder.html#FixedPointFinder.sample_states"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.fixed_points.fp_finder.FixedPointFinder.sample_states" title="Link to this definition">¶</a></dt>
 <dd><p>Draws random samples from trajectories of the RNN state. Samples
 can optionally be corrupted by independent and identically distributed
 (IID) Gaussian noise. These samples are intended to be used as initial
@@ -376,32 +465,48 @@ tensors that may be in state_traj</p>
 
 </section>
 
-
-           </div>
-          </div>
-          <footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>&#169; Copyright 2026, John Lazzari.</p>
-  </div>
-
-  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
-    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   
-
-</footer>
-        </div>
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"><div class="navigation-prev">
+    <a href="mrnntorch.analysis.html">
+      <i class="i-lucide chevron-left"></i>
+      <div class="page-info">
+        <span>Previous</span><div class="title">fixed_points</div></div>
+    </a>
+  </div><div class="navigation-next">
+    <a href="mrnntorch.analysis.flow_fields.html">
+      <div class="page-info">
+        <span>Next</span>
+        <div class="title">flow_field</div>
       </div>
-    </section>
+      <i class="i-lucide chevron-right"></i>
+    </a>
+  </div></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2026, John Lazzari</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div>
+      <div class="sy-foot-socials"></div>
+    </div>
   </div>
-  <script>
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script> 
-
-</body>
+</footer>
+      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/shibuya.js?v=cac61aee"></script></body>
 </html>
