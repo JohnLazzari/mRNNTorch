@@ -1,0 +1,174 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>flow_field &mdash; mRNNTorch 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="linearization" href="mrnntorch.analysis.linear.html" />
+    <link rel="prev" title="fixed_points" href="mrnntorch.analysis.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            mRNNTorch
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="mrnntorch.html">mrnntorch</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.html#region">region</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="mrnntorch.html#analysis">analysis</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.html">fixed_points</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="mrnntorch.analysis.html#flow-fields">flow_fields</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">flow_field</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-mrnntorch.analysis.flow_fields.flow_field_finder">flow_field_finder</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.html#linear">linear</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.html#utils">utils</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mrnntorch.html#module-mrnntorch.mRNN">mrnntorch.mRNN</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">mRNNTorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="mrnntorch.html">mrnntorch</a></li>
+          <li class="breadcrumb-item"><a href="mrnntorch.analysis.html">fixed_points</a></li>
+      <li class="breadcrumb-item active">flow_field</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/mrnntorch.analysis.flow_fields.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-mrnntorch.analysis.flow_fields.flow_field">
+<span id="flow-field"></span><h1>flow_field<a class="headerlink" href="#module-mrnntorch.analysis.flow_fields.flow_field" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="mrnntorch.analysis.flow_fields.flow_field.FlowField">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mrnntorch.analysis.flow_fields.flow_field.</span></span><span class="sig-name descname"><span class="pre">FlowField</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x_vels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_vels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">speeds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/flow_fields/flow_field.html#FlowField"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.flow_fields.flow_field.FlowField" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+</section>
+<section id="module-mrnntorch.analysis.flow_fields.flow_field_finder">
+<span id="flow-field-finder"></span><h1>flow_field_finder<a class="headerlink" href="#module-mrnntorch.analysis.flow_fields.flow_field_finder" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mrnntorch.analysis.flow_fields.flow_field_finder.</span></span><span class="sig-name descname"><span class="pre">FlowFieldFinder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mrnn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="mrnntorch.html#mrnntorch.mRNN.mRNN" title="mrnntorch.mRNN.mRNN"><span class="pre">mRNN</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cancel_other_regions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">follow_traj</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float32</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/analysis/flow_fields/flow_field_finder.html#FlowFieldFinder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder.find_linear_flow">
+<span class="sig-name descname"><span class="pre">find_linear_flow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/flow_fields/flow_field_finder.html#FlowFieldFinder.find_linear_flow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder.find_linear_flow" title="Link to this definition"></a></dt>
+<dd><p>Compute linearized flow fields in a 2D subspace.</p>
+<p>Similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">flow_field()</span></code>, but uses a local linear approximation (Jacobian)
+of the dynamics around points on the trajectory instead of a full forward
+step. Assumes no external input to the selected regions.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>states (torch.Tensor): Hidden activations over time for selected regions, [n, d]</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: FlowField objects per sampled time.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder.find_nonlinear_flow">
+<span class="sig-name descname"><span class="pre">find_nonlinear_flow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stim_input</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/mrnntorch/analysis/flow_fields/flow_field_finder.html#FlowFieldFinder.find_nonlinear_flow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder.find_nonlinear_flow" title="Link to this definition"></a></dt>
+<dd><p>Compute 2D flow fields in a region subspace along a trajectory.</p>
+<p>Projects selected region activity onto a 2D PCA subspace, constructs a grid
+around the current point, and advances the system by one step to estimate
+the local flow (velocity vectors). Can zero out non-selected regions or
+keep their control values.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>states (torch.Tensor): Hidden activations over time [batch_size, T, N].
+inp (torch.Tensor): External input sequence.
+stim_input (torch.Tensor | None): Optional additive stimulus input.
+W (torch.Tensor | None): Optional weight matrix to use.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: FlowField object per sampled time.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="mrnntorch.analysis.html" class="btn btn-neutral float-left" title="fixed_points" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="mrnntorch.analysis.linear.html" class="btn btn-neutral float-right" title="linearization" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, John Lazzari.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

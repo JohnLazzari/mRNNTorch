@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mrnntorch.analysis.flow_fields.flow_field_finder &#8212; mRNNTorch 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for mrnntorch.analysis.flow_fields.flow_field_finder</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.decomposition</span><span class="w"> </span><span class="kn">import</span> <span class="n">PCA</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mrnntorch.analysis.linear.linearization</span><span class="w"> </span><span class="kn">import</span> <span class="n">Linearization</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mrnntorch.analysis.flow_fields.flow_field</span><span class="w"> </span><span class="kn">import</span> <span class="n">FlowField</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mrnntorch.mRNN</span><span class="w"> </span><span class="kn">import</span> <span class="n">mRNN</span>
+
+
+<div class="viewcode-block" id="FlowFieldFinder">
+<a class="viewcode-back" href="../../../../mrnntorch.analysis.flow_fields.html#mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FlowFieldFinder</span><span class="p">:</span>
+    <span class="n">_default_hps</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;num_components&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="s2">&quot;num_points&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="s2">&quot;x_offset&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;y_offset&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;cancel_other_regions&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;follow_traj&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;run&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;reduction_method&quot;</span><span class="p">:</span> <span class="s2">&quot;pca&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mrnn</span><span class="p">:</span> <span class="n">mRNN</span><span class="p">,</span>
+        <span class="n">num_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_default_hps</span><span class="p">[</span><span class="s2">&quot;num_points&quot;</span><span class="p">],</span>
+        <span class="n">x_offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_default_hps</span><span class="p">[</span><span class="s2">&quot;x_offset&quot;</span><span class="p">],</span>
+        <span class="n">y_offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_default_hps</span><span class="p">[</span><span class="s2">&quot;y_offset&quot;</span><span class="p">],</span>
+        <span class="n">cancel_other_regions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_default_hps</span><span class="p">[</span><span class="s2">&quot;cancel_other_regions&quot;</span><span class="p">],</span>
+        <span class="n">follow_traj</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_default_hps</span><span class="p">[</span><span class="s2">&quot;follow_traj&quot;</span><span class="p">],</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">_default_hps</span><span class="p">[</span><span class="s2">&quot;dtype&quot;</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Flow field that gathers a flow field about a specified trajectory</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mrnn (mRNN): mRNN object</span>
+<span class="sd">            num_points (int): number of points to use in grid, results in (num_points, num_points)</span>
+<span class="sd">            x_offset (int): scale to offset grid about trajectory in x direction</span>
+<span class="sd">            y_offset (int): scale to offset grid about trajectory in y direction</span>
+<span class="sd">            cancel_other_regions (bool): whether or not to zero out activity from other regions</span>
+<span class="sd">            follow_traj (bool): whether or not to center the grid around each trajectory</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Hyperparameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span> <span class="o">=</span> <span class="n">mrnn</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span> <span class="o">=</span> <span class="n">num_points</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span> <span class="o">=</span> <span class="n">x_offset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span> <span class="o">=</span> <span class="n">y_offset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cancel_other_regions</span> <span class="o">=</span> <span class="n">cancel_other_regions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">follow_traj</span> <span class="o">=</span> <span class="n">follow_traj</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">dtype</span>
+
+        <span class="c1"># class objects</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reduce_obj</span> <span class="o">=</span> <span class="n">PCA</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">linearization</span> <span class="o">=</span> <span class="n">Linearization</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FlowFieldFinder.find_nonlinear_flow">
+<a class="viewcode-back" href="../../../../mrnntorch.analysis.flow_fields.html#mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder.find_nonlinear_flow">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_nonlinear_flow</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">states</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="n">stim_input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">W</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute 2D flow fields in a region subspace along a trajectory.</span>
+
+<span class="sd">        Projects selected region activity onto a 2D PCA subspace, constructs a grid</span>
+<span class="sd">        around the current point, and advances the system by one step to estimate</span>
+<span class="sd">        the local flow (velocity vectors). Can zero out non-selected regions or</span>
+<span class="sd">        keep their control values.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            states (torch.Tensor): Hidden activations over time [batch_size, T, N].</span>
+<span class="sd">            inp (torch.Tensor): External input sequence.</span>
+<span class="sd">            stim_input (torch.Tensor | None): Optional additive stimulus input.</span>
+<span class="sd">            W (torch.Tensor | None): Optional weight matrix to use.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list: FlowField object per sampled time.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">flow_field_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">batch_first</span><span class="p">:</span>
+            <span class="n">time_dim</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">time_dim</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="n">states</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">states</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">inp</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">inp</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">states</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">states</span><span class="p">,</span> <span class="n">end_dim</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">inp</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="n">end_dim</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">assert</span> <span class="n">states</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">n_states</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">stim_input</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">stim_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">stim_input</span><span class="p">,</span> <span class="n">end_dim</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+            <span class="n">region_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">region</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">region_dict</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">region_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">region</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+
+        <span class="n">reduced_traj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reduce_traj</span><span class="p">(</span><span class="n">states</span><span class="p">,</span> <span class="o">*</span><span class="n">region_list</span><span class="p">)</span>
+
+        <span class="n">lower_bound_x</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span>
+        <span class="n">upper_bound_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span>
+        <span class="n">lower_bound_y</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span>
+        <span class="n">upper_bound_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span>
+
+        <span class="c1"># Now going through trajectory</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_states</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">follow_traj</span><span class="p">:</span>
+                <span class="n">lower_bound_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">upper_bound_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">lower_bound_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">upper_bound_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+            <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">inverse_grid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inverse_grid</span><span class="p">(</span>
+                <span class="n">lower_bound_x</span><span class="p">,</span>
+                <span class="n">upper_bound_x</span><span class="p">,</span>
+                <span class="n">lower_bound_y</span><span class="p">,</span>
+                <span class="n">upper_bound_y</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Repeat along the batch dimension to match the grid</span>
+            <span class="n">full_act_batch</span> <span class="o">=</span> <span class="n">states</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">low_dim_grid</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">full_inp_batch</span> <span class="o">=</span> <span class="n">inp</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">low_dim_grid</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="n">x_0_flow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_full_trajectory</span><span class="p">(</span>
+                <span class="n">inverse_grid</span><span class="p">,</span> <span class="n">full_act_batch</span><span class="p">,</span> <span class="o">*</span><span class="n">region_list</span>
+            <span class="p">)</span>
+
+            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                <span class="c1"># Current timestep input</span>
+                <span class="c1"># Get activity for current timestep</span>
+                <span class="k">if</span> <span class="n">stim_input</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">full_stim_batch</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">x_0_flow</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">full_stim_batch</span> <span class="o">=</span> <span class="n">stim_input</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">low_dim_grid</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+
+                <span class="n">_</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="p">(</span>
+                    <span class="n">full_inp_batch</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">time_dim</span><span class="p">),</span>
+                    <span class="n">x_0_flow</span><span class="p">,</span>
+                    <span class="n">x_0_flow</span><span class="p">,</span>
+                    <span class="n">full_stim_batch</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">time_dim</span><span class="p">),</span>
+                    <span class="n">noise</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">W_rec</span><span class="o">=</span><span class="n">W</span><span class="p">,</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Get activity for regions of interest</span>
+            <span class="n">cur_region_h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">get_region_activity</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="o">*</span><span class="n">region_list</span><span class="p">)</span>
+            <span class="n">cur_region_h</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">cur_region_h</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">cur_region_h</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="n">cur_region_h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reduce_obj</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">cur_region_h</span><span class="p">)</span>
+            <span class="n">cur_region_h</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">cur_region_h</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+            <span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_velocity</span><span class="p">(</span><span class="n">cur_region_h</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">)</span>
+            <span class="n">speed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_speed</span><span class="p">(</span><span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">)</span>
+
+            <span class="c1"># Reshape to match FlowField object requirements</span>
+            <span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">speed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reshape_vals</span><span class="p">(</span>
+                <span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">speed</span>
+            <span class="p">)</span>
+
+            <span class="n">flow_field_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">FlowField</span><span class="p">(</span><span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">speed</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">flow_field_list</span></div>
+
+
+<div class="viewcode-block" id="FlowFieldFinder.find_linear_flow">
+<a class="viewcode-back" href="../../../../mrnntorch.analysis.flow_fields.html#mrnntorch.analysis.flow_fields.flow_field_finder.FlowFieldFinder.find_linear_flow">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_linear_flow</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">states</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute linearized flow fields in a 2D subspace.</span>
+
+<span class="sd">        Similar to :func:`flow_field`, but uses a local linear approximation (Jacobian)</span>
+<span class="sd">        of the dynamics around points on the trajectory instead of a full forward</span>
+<span class="sd">        step. Assumes no external input to the selected regions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            states (torch.Tensor): Hidden activations over time for selected regions, [n, d]</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            list: FlowField objects per sampled time.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Lists for x and y velocities</span>
+        <span class="n">flow_field_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">states</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">states</span><span class="p">,</span> <span class="n">end_dim</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">n_states</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># Gather region list from args, include all regions if args empty</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+            <span class="n">region_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">region</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">region_dict</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">region_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">region</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+
+        <span class="c1"># Activity specific to regions in region list for later computations</span>
+        <span class="n">region_act</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">get_region_activity</span><span class="p">(</span><span class="n">states</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="c1"># Reduce the regional trajectories and return pca object</span>
+        <span class="n">reduced_traj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reduce_traj</span><span class="p">(</span><span class="n">region_act</span><span class="p">,</span> <span class="o">*</span><span class="n">region_list</span><span class="p">)</span>
+
+        <span class="c1"># Grid offsets</span>
+        <span class="n">lower_bound_x</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span>
+        <span class="n">upper_bound_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span>
+        <span class="n">lower_bound_y</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span>
+        <span class="n">upper_bound_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span>
+
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_states</span><span class="p">):</span>
+            <span class="c1"># If follow trajectory is true get grid centered around current t</span>
+            <span class="c1"># This will make a different grid for each state (n grids)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">follow_traj</span><span class="p">:</span>
+                <span class="n">lower_bound_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">upper_bound_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">lower_bound_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">upper_bound_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">reduced_traj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_offset</span><span class="p">,</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+            <span class="c1"># Inverse the grid to pass through RNN</span>
+            <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">inverse_grid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inverse_grid</span><span class="p">(</span>
+                <span class="n">lower_bound_x</span><span class="p">,</span>
+                <span class="n">upper_bound_x</span><span class="p">,</span>
+                <span class="n">lower_bound_y</span><span class="p">,</span>
+                <span class="n">upper_bound_y</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Get a perturbation of the activity</span>
+            <span class="n">x_0_flow</span> <span class="o">=</span> <span class="n">inverse_grid</span> <span class="o">-</span> <span class="n">region_act</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="p">:]</span>
+
+            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                <span class="c1"># Return jacobian found from current trajectory</span>
+                <span class="n">jac_rec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linearization</span><span class="o">.</span><span class="n">jacobian</span><span class="p">(</span>
+                    <span class="n">states</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="p">:],</span> <span class="o">*</span><span class="n">region_list</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span>
+                <span class="p">)</span>
+                <span class="c1"># Get next h</span>
+                <span class="n">h</span> <span class="o">=</span> <span class="n">region_act</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="p">(</span><span class="n">jac_rec</span> <span class="o">@</span> <span class="n">x_0_flow</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+
+            <span class="c1"># Put next h into a grid format</span>
+            <span class="n">cur_region_h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reduce_obj</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+            <span class="n">cur_region_h</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">cur_region_h</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+            <span class="c1"># Compute velocities between gathered trajectory of grid and original grid values</span>
+            <span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_velocity</span><span class="p">(</span><span class="n">cur_region_h</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">)</span>
+            <span class="n">speed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_speed</span><span class="p">(</span><span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">)</span>
+
+            <span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">speed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reshape_vals</span><span class="p">(</span>
+                <span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">speed</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Reshape data back to grid</span>
+            <span class="n">flow_field_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">FlowField</span><span class="p">(</span><span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">,</span> <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">speed</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">flow_field_list</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reduce_traj</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trajectory</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fit PCA object and transform trajectory</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            trajectory (Tensor): states to reduce</span>
+<span class="sd">            args (str, ...): regions to gather</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Tensor: reduced states</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Gather activity for specified region and cell type</span>
+        <span class="n">temp_act</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">get_region_activity</span><span class="p">(</span><span class="n">trajectory</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="n">temp_act</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">temp_act</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">temp_act</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+
+        <span class="c1"># Do PCA on the specified region(s)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reduce_obj</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">temp_act</span><span class="p">)</span>
+        <span class="n">reduced_traj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reduce_obj</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">temp_act</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">reduced_traj</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_inverse_grid</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">lower_bound_x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">upper_bound_x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">lower_bound_y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">upper_bound_y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">expand_dims</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Obtain a low dimensional grid and its projection to higher dim state</span>
+<span class="sd">        space</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            lower_bound_x (float): lower bound of grid in x direction</span>
+<span class="sd">            upper_bound_x (float): upper bound of grid in x direction</span>
+<span class="sd">            lower_bound_y (float): lower bound of grid in y direction</span>
+<span class="sd">            upper_bound_y (float): upper bound of grid in y direction</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: the low dimensional and projected low dimensional grid</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Num points is along each axis, not in total</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">lower_bound_x</span><span class="p">,</span> <span class="n">upper_bound_x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">lower_bound_y</span><span class="p">,</span> <span class="n">upper_bound_y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">)</span>
+
+        <span class="c1"># Gather 2D grid for flow fields</span>
+        <span class="n">xv</span><span class="p">,</span> <span class="n">yv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">xv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">xv</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">yv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">yv</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Convert the grid to a tensor and flatten for PCA</span>
+        <span class="n">low_dim_grid</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">xv</span><span class="p">,</span> <span class="n">yv</span><span class="p">),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">low_dim_grid</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="n">low_dim_grid</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">end_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Inverse PCA to input grid into network</span>
+        <span class="n">inverse_grid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reduce_obj</span><span class="o">.</span><span class="n">inverse_transform</span><span class="p">(</span><span class="n">low_dim_grid</span><span class="p">)</span>
+        <span class="n">inverse_grid</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">inverse_grid</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">expand_dims</span><span class="p">:</span>
+            <span class="n">low_dim_grid</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+                <span class="n">low_dim_grid</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">inverse_grid</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+                <span class="n">inverse_grid</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="n">inverse_grid</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">low_dim_grid</span><span class="p">,</span> <span class="n">inverse_grid</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_full_trajectory</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">full_act_batch</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a grid with containing all regions</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">           grid (Tensor): The inverse grid containing states only for selected regions</span>
+<span class="sd">           [n, num_units_in_selected_regions]</span>
+
+<span class="sd">           full_act_batch (Tensor): The full activity state of the network (containing)</span>
+<span class="sd">           selected and non-selected regions) at current chosen state, repeated over</span>
+<span class="sd">           batch dim to match the number of points in the grid.</span>
+<span class="sd">           [n, num_units_in_network]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Gather batches of grids with trial activity at each timestep</span>
+        <span class="n">grid_region_idx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">x_0_flow</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+                <span class="n">x_0_flow</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">grid</span><span class="p">[</span>
+                        <span class="p">:,</span>
+                        <span class="n">grid_region_idx</span> <span class="p">:</span> <span class="n">grid_region_idx</span>
+                        <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span><span class="p">,</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">grid_region_idx</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Get activity for non-specified regions (either from cache or compute)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cancel_other_regions</span><span class="p">:</span>
+                    <span class="n">region_activity</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">get_region_activity</span><span class="p">(</span><span class="n">full_act_batch</span><span class="p">,</span> <span class="n">region</span><span class="p">)</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">region_activity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mrnn</span><span class="o">.</span><span class="n">get_region_activity</span><span class="p">(</span>
+                        <span class="n">full_act_batch</span><span class="p">,</span> <span class="n">region</span>
+                    <span class="p">)</span>
+                <span class="n">x_0_flow</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">region_activity</span><span class="p">)</span>
+        <span class="n">x_0_flow</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">x_0_flow</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x_0_flow</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_velocity</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">h_next</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">h_prev</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;compute velocity, or h_next - h_prev&quot;&quot;&quot;</span>
+        <span class="n">x_vel</span> <span class="o">=</span> <span class="n">h_next</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">h_prev</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">y_vel</span> <span class="o">=</span> <span class="n">h_next</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">h_prev</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">x_vel</span><span class="p">,</span> <span class="n">y_vel</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_speed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_vel</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">y_vel</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;compute magnitude of velocities&quot;&quot;&quot;</span>
+        <span class="n">speed</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x_vel</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y_vel</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">speed</span> <span class="o">/</span> <span class="n">speed</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reshape_vals</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">x_vels</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">y_vels</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">grid</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">speeds</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Broadcast data to FlowField format</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            x_vels (Tensor): x velocities</span>
+<span class="sd">            y_vels (Tensor): y velocities</span>
+<span class="sd">            grid (Tensor): low dimensional grid coordinates</span>
+<span class="sd">            speeds (Tensor): magnitude of x_vels and y_vels</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Reshape to match FlowField object requirements</span>
+        <span class="n">x_vels</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x_vels</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">))</span>
+        <span class="n">y_vels</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">y_vels</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">))</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">speeds</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">speeds</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">x_vels</span><span class="p">,</span> <span class="n">y_vels</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="n">speeds</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../../index.html">mRNNTorch</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, John Lazzari.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mrnntorch.mRNN &#8212; mRNNTorch 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for mrnntorch.mRNN</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;mRNN core module.</span>
+
+<span class="sd">Implements the multi-regional recurrent neural network (mRNN) building blocks</span>
+<span class="sd">and step-wise dynamics, along with helpers for connectivity, constraints, and</span>
+<span class="sd">initialization.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mrnntorch.region.region_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Region</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mrnntorch.region.recurrent_region</span><span class="w"> </span><span class="kn">import</span> <span class="n">RecurrentRegion</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mrnntorch.region.input_region</span><span class="w"> </span><span class="kn">import</span> <span class="n">InputRegion</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mrnntorch.region.region_base</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DEFAULT_REC_REGIONS</span><span class="p">,</span>
+    <span class="n">DEFAULT_REGION_BASE</span><span class="p">,</span>
+    <span class="n">DEFAULT_CONNECTIONS</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="n">DEFAULTS_MRNN</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;config&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;activation&quot;</span><span class="p">:</span> <span class="s2">&quot;relu&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;noise_level_act&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span>
+    <span class="s2">&quot;noise_level_inp&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span>
+    <span class="s2">&quot;rec_constrained&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">&quot;inp_constrained&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">&quot;dt&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="s2">&quot;tau&quot;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+    <span class="s2">&quot;batch_first&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">&quot;spectral_radius&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;config_finalize&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;cuda&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="linear">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.linear">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">linear</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">x</span></div>
+
+
+
+<div class="viewcode-block" id="mRNN">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">mRNN</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">],</span>
+        <span class="n">activation</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;activation&quot;</span><span class="p">],</span>
+        <span class="n">noise_level_act</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;noise_level_act&quot;</span><span class="p">],</span>
+        <span class="n">noise_level_inp</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;noise_level_inp&quot;</span><span class="p">],</span>
+        <span class="n">rec_constrained</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;rec_constrained&quot;</span><span class="p">],</span>
+        <span class="n">inp_constrained</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;inp_constrained&quot;</span><span class="p">],</span>
+        <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;dt&quot;</span><span class="p">],</span>
+        <span class="n">tau</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;tau&quot;</span><span class="p">],</span>
+        <span class="n">batch_first</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;batch_first&quot;</span><span class="p">],</span>
+        <span class="n">spectral_radius</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;spectral_radius&quot;</span><span class="p">],</span>
+        <span class="n">config_finalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;config_finalize&quot;</span><span class="p">],</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULTS_MRNN</span><span class="p">[</span><span class="s2">&quot;device&quot;</span><span class="p">],</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">mRNN</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Multi-Regional Recurrent Neural Network (mRNN).</span>
+
+<span class="sd">        Simulates interactions between multiple recurrent &quot;regions&quot; with optional</span>
+<span class="sd">        input regions. Supports Dale&#39;s Law constraints, tonic inputs, noise in</span>
+<span class="sd">        hidden state and inputs, and basic step-wise dynamics with configurable</span>
+<span class="sd">        discretization parameters.</span>
+
+<span class="sd">        Key features:</span>
+<span class="sd">        - Multiple regions with independent sizes and signs (excitatory/inhibitory)</span>
+<span class="sd">        - Dale&#39;s Law constraints via sign masks on weights</span>
+<span class="sd">        - Optional noise on hidden state and input</span>
+<span class="sd">        - Tonic (baseline) input per region</span>
+<span class="sd">        - JSON-based configuration or fully manual construction</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config (str | None): Path to a JSON configuration file describing</span>
+<span class="sd">                recurrent regions, input regions, and their connections. If None,</span>
+<span class="sd">                build the network manually by calling the add_* methods.</span>
+<span class="sd">            activation (str): One of {&quot;relu&quot;, &quot;tanh&quot;, &quot;sigmoid&quot;, &quot;softplus&quot;, &quot;linear&quot;}.</span>
+<span class="sd">            noise_level_act (float): Std of hidden-state noise term. Default: 0.01.</span>
+<span class="sd">            noise_level_inp (float): Std of input noise term. Default: 0.01.</span>
+<span class="sd">            rec_constrained (bool): If True, apply Dale&#39;s Law to rec regions. Default: True.</span>
+<span class="sd">            inp_constrained (bool): If True, apply Dale&#39;s Law to inp regions. Default: True.</span>
+<span class="sd">            dt (float): Discrete step in ms used for the Euler update. Default: 10.</span>
+<span class="sd">            tau (float): Time constant in ms; alpha = dt / tau. Default: 100.</span>
+<span class="sd">            batch_first (bool): If True, sequences are [B, T, ...]; else [T, B, ...].</span>
+<span class="sd">            spectral_radius (float | None): If set, scales recurrent weights so the</span>
+<span class="sd">                spectral radius equals this value after finalization.</span>
+<span class="sd">            config_finalize (bool): If True and a config is supplied, finalize</span>
+<span class="sd">                connectivity after reading config. Default: True.</span>
+<span class="sd">            device (str): Torch device string (e.g., &quot;cpu&quot; or &quot;cuda&quot;). Default: &quot;cuda&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># TODO potentially add getitem and setitem with str indexing</span>
+        <span class="c1"># Initialize network parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">region_mask_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rec_constrained</span> <span class="o">=</span> <span class="n">rec_constrained</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inp_constrained</span> <span class="o">=</span> <span class="n">inp_constrained</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dt</span> <span class="o">=</span> <span class="n">dt</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tau</span> <span class="o">=</span> <span class="n">tau</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dt</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tau</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_first</span> <span class="o">=</span> <span class="n">batch_first</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sigma_recur</span> <span class="o">=</span> <span class="n">noise_level_act</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sigma_input</span> <span class="o">=</span> <span class="n">noise_level_inp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">activation_name</span> <span class="o">=</span> <span class="n">activation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectral_radius</span> <span class="o">=</span> <span class="n">spectral_radius</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config_finalize</span> <span class="o">=</span> <span class="n">config_finalize</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rec_finalized</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inp_finalized</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># Specify activation function</span>
+        <span class="c1"># Only common activations are implemented</span>
+        <span class="k">if</span> <span class="n">activation</span> <span class="o">==</span> <span class="s2">&quot;relu&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">activation</span> <span class="o">==</span> <span class="s2">&quot;tanh&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Tanh</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">activation</span> <span class="o">==</span> <span class="s2">&quot;sigmoid&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sigmoid</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">activation</span> <span class="o">==</span> <span class="s2">&quot;softplus&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Softplus</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">activation</span> <span class="o">==</span> <span class="s2">&quot;linear&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">linear</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;Only relu, tanh, sigmoid, or linear activations are implemented&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Allow configuration file to be optional</span>
+        <span class="c1"># If configuration is given, network will be automatically generated using it</span>
+        <span class="c1"># Otherwise, user will manually build a network in their own class</span>
+        <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Load and process configuration</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">config_file</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+            <span class="c1"># Default everything to empty dict</span>
+            <span class="c1"># Nothing inherently needs to be specified and can instead be created in custom network</span>
+            <span class="n">config_file</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;recurrent_regions&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">config_file</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;input_regions&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">config_file</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;recurrent_connections&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">config_file</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;input_connections&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                Configuration file protocol:</span>
+<span class="sd">                </span>
+<span class="sd">                    Here we are allowing flexibility between using configs vs. custom network definitions.</span>
+<span class="sd">                    None of the regions or connections in the network need to be fully specified in the config.</span>
+<span class="sd">                    Users can specify some regions and connections in the config, then define the rest manually if</span>
+<span class="sd">                    they choose.</span>
+<span class="sd">                    </span>
+<span class="sd">                    config_finalize is defaulted to True, this assumes that the connections in the configuration</span>
+<span class="sd">                    define all of the connections in the network, and that the network will be finalized automatically </span>
+<span class="sd">                    after passing the config. Users can set this to False to continue to build regions and </span>
+<span class="sd">                    connections in their custom model after passing the config.</span>
+
+<span class="sd">                    Lastly, an empty config that is passed in(or empty parts of the config) default to an empty dictionary {}. </span>
+<span class="sd">                    In this case, any key in the json file that is empty will not affect the network or be defined at all.</span>
+<span class="sd">                    These missing pieces must then be defined in the custom model. Connections that are defined in the </span>
+<span class="sd">                    config without the corresponding regions being defined will give an error.</span>
+<span class="sd">                    Additionally, the config file itself defaults to None, which would then imply the user needs to</span>
+<span class="sd">                    manually enter all regions and connections in the custom model.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+
+            <span class="c1"># Generate network structure</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_create_def_values</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;recurrent_regions&quot;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># Generate recurrent regions</span>
+                <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;recurrent_regions&quot;</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">add_recurrent_region</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                        <span class="n">num_units</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;num_units&quot;</span><span class="p">],</span>
+                        <span class="n">sign</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;sign&quot;</span><span class="p">],</span>
+                        <span class="n">base_firing</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;base_firing&quot;</span><span class="p">],</span>
+                        <span class="n">init</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;init&quot;</span><span class="p">],</span>
+                        <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                        <span class="n">parent_region</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;parent_region&quot;</span><span class="p">],</span>
+                        <span class="n">learnable_bias</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;learnable_bias&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;input_regions&quot;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># Generate input regions</span>
+                <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;input_regions&quot;</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">add_input_region</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                        <span class="n">num_units</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;num_units&quot;</span><span class="p">],</span>
+                        <span class="n">sign</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s2">&quot;sign&quot;</span><span class="p">],</span>
+                        <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+            <span class="c1"># Now checking whether or not connections are specified in config</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;recurrent_connections&quot;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># Generate recurrent connections</span>
+                <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;recurrent_connections&quot;</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">add_recurrent_connection</span><span class="p">(</span>
+                        <span class="n">src_region</span><span class="o">=</span><span class="n">connection</span><span class="p">[</span><span class="s2">&quot;src_region&quot;</span><span class="p">],</span>
+                        <span class="n">dst_region</span><span class="o">=</span><span class="n">connection</span><span class="p">[</span><span class="s2">&quot;dst_region&quot;</span><span class="p">],</span>
+                        <span class="n">sparsity</span><span class="o">=</span><span class="n">connection</span><span class="p">[</span><span class="s2">&quot;sparsity&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                    Finalization for Configuration:</span>
+
+<span class="sd">                        This completes the connections matrix between regions </span>
+<span class="sd">                        by padding with zeros where explicit connections are not specified.</span>
+<span class="sd">                &quot;&quot;&quot;</span>
+
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config_finalize</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">finalize_rec_connectivity</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;input_connections&quot;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># Generate input connections</span>
+                <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="n">config_file</span><span class="p">[</span><span class="s2">&quot;input_connections&quot;</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">add_input_connection</span><span class="p">(</span>
+                        <span class="n">src_region</span><span class="o">=</span><span class="n">connection</span><span class="p">[</span><span class="s2">&quot;src_region&quot;</span><span class="p">],</span>
+                        <span class="n">dst_region</span><span class="o">=</span><span class="n">connection</span><span class="p">[</span><span class="s2">&quot;dst_region&quot;</span><span class="p">],</span>
+                        <span class="n">sparsity</span><span class="o">=</span><span class="n">connection</span><span class="p">[</span><span class="s2">&quot;sparsity&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+                <span class="c1"># Finalization input regions</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config_finalize</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">finalize_inp_connectivity</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">region</span><span class="p">:</span> <span class="n">RecurrentRegion</span> <span class="o">|</span> <span class="n">InputRegion</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Assign a recurrent region or input region to a valid index in mRNN</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            idx (str): an input or recurrent region in the mRNN</span>
+<span class="sd">            region (RecurrentRegion | InputRegion): the new region used for assignment</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span> <span class="s2">&quot;Only string indexing to regions is allowed&quot;</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">region</span><span class="p">,</span> <span class="n">RecurrentRegion</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">region</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Not a RecurrentRegion object, </span><span class="se">\</span>
+<span class="s2">                    cannot assign to recurrent region&quot;</span>
+                <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">region</span><span class="p">,</span> <span class="n">InputRegion</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">region</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Not an InputRegion object, </span><span class="se">\</span>
+<span class="s2">                    cannot assign to input region&quot;</span>
+                <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Index not a valid recurrent or input region&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RecurrentRegion</span> <span class="o">|</span> <span class="n">InputRegion</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Index a recurrent region or input region in mRNN</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            idx (str): an input or recurrent region in the mRNN</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span> <span class="s2">&quot;Only string indexing to regions is allowed&quot;</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Index not a valid recurrent or input region&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="mRNN.add_recurrent_region">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.add_recurrent_region">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_recurrent_region</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">num_units</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">sign</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="s2">&quot;sign&quot;</span><span class="p">],</span>
+        <span class="n">base_firing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="s2">&quot;base_firing&quot;</span><span class="p">],</span>
+        <span class="n">init</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="s2">&quot;init&quot;</span><span class="p">],</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="s2">&quot;device&quot;</span><span class="p">],</span>
+        <span class="n">parent_region</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="s2">&quot;parent_region&quot;</span><span class="p">],</span>
+        <span class="n">learnable_bias</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="s2">&quot;learnable_bias&quot;</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a recurrent region to the network.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name (str): Region name (unique key).</span>
+<span class="sd">            num_units (int): Number of units in this region.</span>
+<span class="sd">            sign (str): &quot;pos&quot; for excitatory or &quot;neg&quot; for inhibitory outputs.</span>
+<span class="sd">            base_firing (float | torch.Tensor): Baseline firing per unit.</span>
+<span class="sd">            init (float): Initial pre-activation value for units in this region.</span>
+<span class="sd">            device (str): Device where tensors for this region live.</span>
+<span class="sd">            parent_region (str | None): Optional parent region identifier.</span>
+<span class="sd">            learnable_bias (bool): If True, baseline firing is trainable.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_finalized</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;Recurrent connectivity already finalized, please </span><span class="se">\</span>
+<span class="s2">                include all regions and connections beforehand&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Create region</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">RecurrentRegion</span><span class="p">(</span>
+            <span class="n">num_units</span><span class="o">=</span><span class="n">num_units</span><span class="p">,</span>
+            <span class="n">base_firing</span><span class="o">=</span><span class="n">base_firing</span><span class="p">,</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+            <span class="n">sign</span><span class="o">=</span><span class="n">sign</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+            <span class="n">parent_region</span><span class="o">=</span><span class="n">parent_region</span><span class="p">,</span>
+            <span class="n">learnable_bias</span><span class="o">=</span><span class="n">learnable_bias</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># General network parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_total_num_units</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">)</span>
+        <span class="c1"># Get indices for specific regions</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="c1"># Get the mask for the whole region, regardless of cell type</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">region_mask_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">region_mask_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gen_region_mask</span><span class="p">(</span><span class="n">region</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="mRNN.add_input_region">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.add_input_region">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_input_region</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">num_units</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">sign</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_REGION_BASE</span><span class="p">[</span><span class="s2">&quot;sign&quot;</span><span class="p">],</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_REGION_BASE</span><span class="p">[</span><span class="s2">&quot;device&quot;</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add an input region to the network.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name (str): Input region name (unique key).</span>
+<span class="sd">            num_units (int): Number of input channels in this region.</span>
+<span class="sd">            sign (str): &quot;pos&quot; or &quot;neg&quot;; used to set sign mask for inputs.</span>
+<span class="sd">            device (str): Device where tensors for this region live.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_finalized</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;Input connectivity already finalized, </span><span class="se">\</span>
+<span class="s2">                please include all regions and connections beforehand&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Create region</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">InputRegion</span><span class="p">(</span><span class="n">num_units</span><span class="o">=</span><span class="n">num_units</span><span class="p">,</span> <span class="n">sign</span><span class="o">=</span><span class="n">sign</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="c1"># Update number of input units</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_num_inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_total_num_units</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="mRNN.add_recurrent_connection">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.add_recurrent_connection">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_recurrent_connection</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">src_region</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">dst_region</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_CONNECTIONS</span><span class="p">[</span><span class="s2">&quot;sparsity&quot;</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a recurrent connection from one region to another.</span>
+
+<span class="sd">        Registers the weight parameter and associated masks. If ``sparsity`` is</span>
+<span class="sd">        provided, a binary connectivity mask is sampled accordingly.</span>
+
+<span class="sd">        Currently not allowed to make a zero connection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            src_region (str): Source recurrent region name.</span>
+<span class="sd">            dst_region (str): Destination recurrent region name.</span>
+<span class="sd">            sparsity (float | None): Fraction of connections to keep (0-1). If</span>
+<span class="sd">                None, dense mask is used.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Ensure that no more connections can be added if network is finalized</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_finalized</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;Recurrent connectivity already finalized, </span><span class="se">\</span>
+<span class="s2">                please include all regions and connections beforehand&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Add connection to specified region object</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">src_region</span><span class="p">]</span><span class="o">.</span><span class="n">add_connection</span><span class="p">(</span>
+            <span class="n">dst_region_name</span><span class="o">=</span><span class="n">dst_region</span><span class="p">,</span>
+            <span class="n">dst_region_units</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">dst_region</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span><span class="p">,</span>
+            <span class="n">sparsity</span><span class="o">=</span><span class="n">sparsity</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Get the empty weights</span>
+        <span class="n">weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">src_region</span><span class="p">][</span><span class="n">dst_region</span><span class="p">]</span><span class="o">.</span><span class="n">parameter</span>
+
+        <span class="c1"># initialize the empty weights based on constraints</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_constrained</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_constrained_default_init_rec</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">xavier_normal_</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="mRNN.add_input_connection">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.add_input_connection">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_input_connection</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">src_region</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">dst_region</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">DEFAULT_CONNECTIONS</span><span class="p">[</span><span class="s2">&quot;sparsity&quot;</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an input connection from an input region to a recurrent region.</span>
+<span class="sd">        Currently not allowed to make a zero connection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            src_region (str): Source input region name.</span>
+<span class="sd">            dst_region (str): Destination recurrent region name.</span>
+<span class="sd">            sparsity (float | None): Fraction of connections to keep (0-1). If</span>
+<span class="sd">                None, dense mask is used.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_finalized</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;Input connectivity already finalized, </span><span class="se">\</span>
+<span class="s2">                please include all regions and connections beforehand&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Add connection to specified input region object</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">[</span><span class="n">src_region</span><span class="p">]</span><span class="o">.</span><span class="n">add_connection</span><span class="p">(</span>
+            <span class="n">dst_region_name</span><span class="o">=</span><span class="n">dst_region</span><span class="p">,</span>
+            <span class="n">dst_region_units</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">dst_region</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span><span class="p">,</span>
+            <span class="n">sparsity</span><span class="o">=</span><span class="n">sparsity</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Access empty input weight</span>
+        <span class="n">weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">[</span><span class="n">src_region</span><span class="p">][</span><span class="n">dst_region</span><span class="p">]</span><span class="o">.</span><span class="n">parameter</span>
+
+        <span class="c1"># initialize the weight depending on constraints</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_constrained</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_constrained_default_init_inp</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">xavier_normal_</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="mRNN.set_spectral_radius">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.set_spectral_radius">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_spectral_radius</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">W_tmp</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Scale recurrent weights so their spectral radius matches ``self.spectral_radius``.</span>
+
+<span class="sd">        Usage:</span>
+<span class="sd">        1. Define regions and connections (via config or manual methods).</span>
+<span class="sd">        2. If building manually, call :meth:`finalize_connectivity` first.</span>
+<span class="sd">        3. Set ``self.spectral_radius`` and call this method.</span>
+<span class="sd">        4. W_tmp will compute spectral radius of another network (i.e dales law network)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Compute spectral radius</span>
+        <span class="k">if</span> <span class="n">W_tmp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cur_spectral_radius</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_spectral_radius</span><span class="p">(</span><span class="n">W_tmp</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cur_spectral_radius</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_spectral_radius</span><span class="p">(</span><span class="n">W</span><span class="p">)</span>
+        <span class="n">W_scaled</span> <span class="o">=</span> <span class="p">(</span><span class="n">W</span> <span class="o">/</span> <span class="n">cur_spectral_radius</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectral_radius</span>
+        <span class="k">return</span> <span class="n">W_scaled</span></div>
+
+
+<div class="viewcode-block" id="mRNN.finalize_connectivity">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.finalize_connectivity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">finalize_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Finalize both input and recurrent connectivity</span>
+<span class="sd">        This function is primarily implemented so users don&#39;t have to</span>
+<span class="sd">        separately call rec and inp connectivity functions</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_finalized</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">finalize_rec_connectivity</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_finalized</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">finalize_inp_connectivity</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="mRNN.finalize_rec_connectivity">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.finalize_rec_connectivity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">finalize_rec_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fill rest of recurrent connections with zeros</span>
+<span class="sd">        Ensure finalized flag is set to true</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_full_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">region</span><span class="p">])</span>
+        <span class="c1"># Apply Dale&#39;s Law if constrained</span>
+        <span class="n">W_rec</span><span class="p">,</span> <span class="n">W_rec_mask</span><span class="p">,</span> <span class="n">W_rec_sign_matrix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gen_w</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">)</span>
+        <span class="c1"># Set spectral radius</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectral_radius</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_constrained</span><span class="p">:</span>
+                <span class="n">W_rec_tmp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_dales_law</span><span class="p">(</span><span class="n">W_rec</span><span class="p">,</span> <span class="n">W_rec_mask</span><span class="p">,</span> <span class="n">W_rec_sign_matrix</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">W_rec_tmp</span> <span class="o">=</span> <span class="n">W_rec</span> <span class="o">*</span> <span class="n">W_rec_mask</span>
+            <span class="n">W_rec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_spectral_radius</span><span class="p">(</span><span class="n">W_rec</span><span class="p">,</span> <span class="n">W_tmp</span><span class="o">=</span><span class="n">W_rec_tmp</span><span class="p">)</span>
+        <span class="c1"># Create parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">W_rec</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">W_rec</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_mask</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">W_rec_mask</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_sign_matrix</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">W_rec_sign_matrix</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># Set finalized flag to true, no more connections can be added</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rec_finalized</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="mRNN.finalize_inp_connectivity">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.finalize_inp_connectivity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">finalize_inp_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fill rest of input connections with zeros</span>
+<span class="sd">        Ensure finalized flag is set to true</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">inp</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_full_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">[</span><span class="n">inp</span><span class="p">])</span>
+        <span class="c1"># Apply to input weights as well</span>
+        <span class="n">W_inp</span><span class="p">,</span> <span class="n">W_inp_mask</span><span class="p">,</span> <span class="n">W_inp_sign_matrix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gen_w</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">)</span>
+        <span class="c1"># Create parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">W_inp</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">W_inp</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">W_inp_mask</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">W_inp_mask</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">W_inp_sign_matrix</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">W_inp_sign_matrix</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># Set finalized flag to true, no more connections can be added</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inp_finalized</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="mRNN.compute_spectral_radius">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.compute_spectral_radius">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_spectral_radius</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">weight</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the spectral radius (max |eigenvalue|) of a square matrix.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            weight (torch.Tensor): Square weight matrix.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Spectral radius as a scalar tensor.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Largest absolute eigenvalue of W_rec</span>
+        <span class="n">eig_vals</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigvals</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+        <span class="n">abs_eig_vals</span> <span class="o">=</span> <span class="n">eig_vals</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span>
+        <span class="n">spectral_radius</span> <span class="o">=</span> <span class="n">abs_eig_vals</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">spectral_radius</span></div>
+
+
+<div class="viewcode-block" id="mRNN.gen_w">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.gen_w">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">gen_w</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dict_</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates the full recurrent connectivity matrix and associated masks.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: (W_rec, W_rec_mask, W_rec_sign_matrix)</span>
+<span class="sd">                - W_rec: Learnable weight matrix</span>
+<span class="sd">                - W_rec_mask: Binary mask for allowed connections</span>
+<span class="sd">                - W_rec_sign_matrix: Sign constraints for Dale&#39;s Law</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Initialize empty lists to hold the concatenated tensors</span>
+        <span class="n">region_connection_columns</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">region_weight_mask_columns</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">region_sign_matrix_columns</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Iterate over the regions in dict_</span>
+        <span class="k">for</span> <span class="n">cur_region</span> <span class="ow">in</span> <span class="n">dict_</span><span class="p">:</span>
+            <span class="c1"># List comprehensions to collect connections, masks, and sign matrices</span>
+            <span class="c1"># calling Region[connection] should invoke __getitem__</span>
+            <span class="n">connections_from_region</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">dict_</span><span class="p">[</span><span class="n">cur_region</span><span class="p">][</span><span class="n">connection</span><span class="p">]</span><span class="o">.</span><span class="n">parameter</span>
+                <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span>
+            <span class="p">]</span>
+            <span class="n">weight_mask_from_region</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">dict_</span><span class="p">[</span><span class="n">cur_region</span><span class="p">][</span><span class="n">connection</span><span class="p">]</span><span class="o">.</span><span class="n">weight_mask</span>
+                <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span>
+            <span class="p">]</span>
+            <span class="n">sign_matrix_from_region</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">dict_</span><span class="p">[</span><span class="n">cur_region</span><span class="p">][</span><span class="n">connection</span><span class="p">]</span><span class="o">.</span><span class="n">sign_matrix</span>
+                <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span>
+            <span class="p">]</span>
+
+            <span class="c1"># Concatenate the region-specific matrices and append to the lists</span>
+            <span class="n">region_connection_columns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">connections_from_region</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+            <span class="n">region_weight_mask_columns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">weight_mask_from_region</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+            <span class="n">region_sign_matrix_columns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">sign_matrix_from_region</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="c1"># Concatenate all region-specific matrices along the column dimension</span>
+        <span class="n">W_rec</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">region_connection_columns</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">W_rec_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">region_weight_mask_columns</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">W_rec_sign</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">region_sign_matrix_columns</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">W_rec</span><span class="p">,</span> <span class="n">W_rec_mask</span><span class="p">,</span> <span class="n">W_rec_sign</span></div>
+
+
+<div class="viewcode-block" id="mRNN.apply_dales_law">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.apply_dales_law">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply_dales_law</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">W_rec</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">W_rec_mask</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">W_rec_sign_matrix</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Applies Dale&#39;s Law constraints to the recurrent weight matrix.</span>
+<span class="sd">        Dale&#39;s Law states that a neuron can be either excitatory or inhibitory, but not both.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Constrained weight matrix</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">W_rec_mask</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">W_rec</span><span class="p">)</span> <span class="o">*</span> <span class="n">W_rec_sign_matrix</span></div>
+
+
+<div class="viewcode-block" id="mRNN.get_tonic_inp">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.get_tonic_inp">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_tonic_inp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collects baseline firing rates for all regions.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Vector of baseline firing rates</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">region</span><span class="o">.</span><span class="n">base_firing</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="o">.</span><span class="n">values</span><span class="p">()]</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="mRNN.named_rec_regions">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.named_rec_regions">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">named_rec_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loop through rec region names and objects</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            prefix (str, optional): Defaults to &#39;&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">prefix</span> <span class="o">+</span> <span class="n">name</span><span class="p">,</span> <span class="n">region</span></div>
+
+
+<div class="viewcode-block" id="mRNN.named_inp_regions">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.named_inp_regions">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">named_inp_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loop through inp region names and objects</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            prefix (str, optional): Defaults to &#39;&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">prefix</span> <span class="o">+</span> <span class="n">name</span><span class="p">,</span> <span class="n">region</span></div>
+
+
+<div class="viewcode-block" id="mRNN.get_region_size">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.get_region_size">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_region_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the number of units in a region(s)&quot;&quot;&quot;</span>
+        <span class="n">units</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+            <span class="n">units</span> <span class="o">+=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span>
+                <span class="k">if</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span>
+                <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">units</span></div>
+
+
+<div class="viewcode-block" id="mRNN.get_region_activity">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.get_region_activity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_region_activity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">act</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Takes in hn and the specified region and returns the activity hn for the corresponding region</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            act (Torch.Tensor): tensor containing model hidden activity. Activations must be in last dimension (-1)</span>
+<span class="sd">            args (str): name of regions to collect activity from</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            region_hn: tensor containing hidden activity only for specified region</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Default to returning whole activity</span>
+        <span class="n">unique_regions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">OrderedDict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">args</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">act</span>
+        <span class="c1"># Check to ensure region is recurrent</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Can only get activity for recurrent regions&quot;</span><span class="p">)</span>
+
+        <span class="n">args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_order</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+
+        <span class="c1"># Go and check if any parent regions are entered</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">unique_regions</span><span class="o">.</span><span class="n">copy</span><span class="p">():</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_if_parent_region</span><span class="p">(</span><span class="n">region</span><span class="p">):</span>
+                <span class="n">unique_regions</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">region</span><span class="p">)</span>
+                <span class="n">unique_regions</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_child_regions</span><span class="p">(</span><span class="n">region</span><span class="p">))</span>
+
+        <span class="c1"># collect all necessary indices now</span>
+        <span class="n">region_indices</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">region</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_region_indices</span><span class="p">(</span><span class="n">region</span><span class="p">)</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">unique_regions</span>
+        <span class="p">}</span>
+
+        <span class="n">region_acts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="n">act</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">start_idx</span><span class="p">:</span><span class="n">end_idx</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">unique_regions</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">start_idx</span><span class="p">,</span> <span class="n">end_idx</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[</span><span class="n">region_indices</span><span class="p">[</span><span class="n">region</span><span class="p">]]</span>
+            <span class="p">],</span>
+            <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">region_acts</span></div>
+
+
+<div class="viewcode-block" id="mRNN.get_weight_subset">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.get_weight_subset">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_weight_subset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gather a subset of the weights from all regions in args to and from</span>
+<span class="sd">        each other and themselves.</span>
+
+<span class="sd">        This should return a square matrix of all connections between regions in</span>
+<span class="sd">        args</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            args (str): all regions specified</span>
+<span class="sd">            W (torch.Tensor): use this specified weight matrix instead</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: subset of the total weight matrix</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">W</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Gather original weight matrix and apply Dale&#39;s Law if constrained</span>
+            <span class="c1"># Can only be recurrent if not using to and from</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_constrained</span><span class="p">:</span>
+                <span class="n">mrnn_weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_dales_law</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">W_rec</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_mask</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_sign_matrix</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mrnn_weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_mask</span>
+
+            <span class="c1"># Default to standard weight matrix if no regions are provided</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">mrnn_weight</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mrnn_weight</span> <span class="o">=</span> <span class="n">W</span>
+
+        <span class="c1"># Check if user specifies input region through args instead of to, from</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Can only gather input subsets using get_projection&quot;</span><span class="p">)</span>
+
+        <span class="n">args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_order</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+
+        <span class="c1"># This is used to store the final collected weight matrix</span>
+        <span class="n">global_weight_collection</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">region_indices</span> <span class="o">=</span> <span class="p">{</span><span class="n">region</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_region_indices</span><span class="p">(</span><span class="n">region</span><span class="p">)</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">args</span><span class="p">}</span>
+
+        <span class="c1"># List comprehension that gathers all information gathering weight subset</span>
+        <span class="n">global_weight_collection</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">mrnn_weight</span><span class="p">[</span><span class="n">src_start_idx</span><span class="p">:</span><span class="n">src_end_idx</span><span class="p">,</span> <span class="n">dst_start_idx</span><span class="p">:</span><span class="n">dst_end_idx</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">dst_region</span> <span class="ow">in</span> <span class="n">args</span>
+                    <span class="k">for</span> <span class="n">dst_start_idx</span><span class="p">,</span> <span class="n">dst_end_idx</span> <span class="ow">in</span> <span class="p">[</span><span class="n">region_indices</span><span class="p">[</span><span class="n">dst_region</span><span class="p">]]</span>
+                <span class="p">],</span>
+                <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">src_start_idx</span><span class="p">,</span> <span class="n">src_end_idx</span><span class="p">)</span> <span class="ow">in</span> <span class="n">region_indices</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">]</span>
+
+        <span class="c1"># Similar to before but now concatenating along rows</span>
+        <span class="n">global_weight_collection</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">global_weight_collection</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">global_weight_collection</span></div>
+
+
+<div class="viewcode-block" id="mRNN.get_projection">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.get_projection">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_projection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">to</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">from_</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gather a subset of the weights</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            to (str): Name of region that is recieving projection (row)</span>
+<span class="sd">            from_ (str): Name of region projecting (column)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: weight matrix of from_-&gt;to projection</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Store regions if parent regions are given</span>
+        <span class="n">to_regions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">from_regions</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># If to region is a parent region, then get children regions</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_if_parent_region</span><span class="p">(</span><span class="n">to</span><span class="p">):</span>
+            <span class="n">to_regions</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_child_regions</span><span class="p">(</span><span class="n">to</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">to_regions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to</span><span class="p">)</span>
+        <span class="c1"># If from region is a parent region, then get children regions</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_if_parent_region</span><span class="p">(</span><span class="n">from_</span><span class="p">):</span>
+            <span class="n">from_regions</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_child_regions</span><span class="p">(</span><span class="n">from_</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">from_regions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">from_</span><span class="p">)</span>
+
+        <span class="c1"># Check which weight matrix to use based on from region</span>
+        <span class="k">if</span> <span class="n">from_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_constrained</span><span class="p">:</span>
+                <span class="n">weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_dales_law</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">W_rec</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_mask</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_sign_matrix</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec</span>
+        <span class="k">elif</span> <span class="n">from_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_constrained</span><span class="p">:</span>
+                <span class="n">weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_dales_law</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">W_inp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_inp_mask</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_inp_sign_matrix</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_inp</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;from_ region not in region or input dictionary&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Store all of the weights to region from another</span>
+        <span class="n">to_from_weight</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># Now go through each of the collected regions and get the weights</span>
+        <span class="k">for</span> <span class="n">to_region</span> <span class="ow">in</span> <span class="n">to_regions</span><span class="p">:</span>
+            <span class="n">from_weight</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="c1"># Get the indices for to region</span>
+            <span class="n">to_start_idx</span><span class="p">,</span> <span class="n">to_end_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_region_indices</span><span class="p">(</span><span class="n">to_region</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">from_region</span> <span class="ow">in</span> <span class="n">from_regions</span><span class="p">:</span>
+                <span class="c1"># Gather indices</span>
+                <span class="n">from_start_idx</span><span class="p">,</span> <span class="n">from_end_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_region_indices</span><span class="p">(</span><span class="n">from_region</span><span class="p">)</span>
+                <span class="n">from_weight</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">weight</span><span class="p">[</span><span class="n">to_start_idx</span><span class="p">:</span><span class="n">to_end_idx</span><span class="p">,</span> <span class="n">from_start_idx</span><span class="p">:</span><span class="n">from_end_idx</span><span class="p">]</span>
+                <span class="p">)</span>
+            <span class="c1"># Collect all of the weights for from region</span>
+            <span class="n">collected_from_weight</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">from_weight</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">to_from_weight</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">collected_from_weight</span><span class="p">)</span>
+        <span class="c1"># Collect final weight matrix</span>
+        <span class="n">collected_to_from_weight</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">to_from_weight</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">collected_to_from_weight</span></div>
+
+
+<div class="viewcode-block" id="mRNN.get_region_indices">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.get_region_indices">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_region_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">region</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets the start and end indices for a specific region in the hidden state vector.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            region (str): Name of the region</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: (start_idx, end_idx)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_if_parent_region</span><span class="p">(</span><span class="n">region</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Can only get indices of a single region, not parent region&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Get the region indices</span>
+        <span class="n">start_idx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">end_idx</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># Check whether or not specified region is input or rec</span>
+        <span class="c1"># This is to handle indices for both rec and inp regions</span>
+        <span class="k">if</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="n">dict_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span>
+        <span class="k">elif</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">:</span>
+            <span class="n">dict_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Not an input or recurrent region&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">cur_reg</span> <span class="ow">in</span> <span class="n">dict_</span><span class="p">:</span>
+            <span class="n">region_units</span> <span class="o">=</span> <span class="n">dict_</span><span class="p">[</span><span class="n">cur_reg</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span>
+            <span class="k">if</span> <span class="n">cur_reg</span> <span class="o">==</span> <span class="n">region</span><span class="p">:</span>
+                <span class="n">end_idx</span> <span class="o">=</span> <span class="n">start_idx</span> <span class="o">+</span> <span class="n">region_units</span>
+                <span class="k">break</span>
+            <span class="n">start_idx</span> <span class="o">+=</span> <span class="n">region_units</span>
+
+        <span class="k">return</span> <span class="n">start_idx</span><span class="p">,</span> <span class="n">end_idx</span></div>
+
+
+<div class="viewcode-block" id="mRNN.get_initial_condition">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.get_initial_condition">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_initial_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xn</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an initial xn for the network</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            xn (Tensor): empty or zero tensor to hold initial condition</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Tensor: tensor like xn filled with region specified initial conds</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Initialize x and h</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="n">start_idx</span><span class="p">,</span> <span class="n">end_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_region_indices</span><span class="p">(</span><span class="n">region</span><span class="p">)</span>
+            <span class="n">xn</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">start_idx</span><span class="p">:</span><span class="n">end_idx</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span><span class="o">.</span><span class="n">init</span>
+        <span class="k">return</span> <span class="n">xn</span></div>
+
+
+<div class="viewcode-block" id="mRNN.forward">
+<a class="viewcode-back" href="../../mrnntorch.html#mrnntorch.mRNN.mRNN.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">x0</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">h0</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="n">noise</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">W_rec</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">W_inp</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the recurrent dynamics over a sequence.</span>
+
+<span class="sd">        Discretized update: ``x_{t+1} = x_t + alpha * (-x_t + W_rec h_t + W_inp u_t + b + noise)``</span>
+<span class="sd">        and ``h_{t+1} = activation(x_{t+1})``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            inp (torch.Tensor): Input sequence. Shape ``[B, T, I]`` if batch_first</span>
+<span class="sd">                else ``[T, B, I]``.</span>
+<span class="sd">            x0 (torch.Tensor): Initial pre-activation hidden state, shape ``[B, H]``.</span>
+<span class="sd">            h0 (torch.Tensor): Initial activation, shape ``[B, H]``.</span>
+<span class="sd">            *args (torch.Tensor): Optional additive inputs with same temporal layout</span>
+<span class="sd">                as ``inp`` and feature size ``H``.</span>
+<span class="sd">            noise (bool): If True, add Gaussian noise to hidden state and inputs.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[torch.Tensor, torch.Tensor]: ``(x_seq, h_seq)`` sequences matching</span>
+<span class="sd">            the temporal layout of ``inp``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inp_dict</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_finalized</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_finalized</span><span class="p">,</span> <span class="p">(</span>
+            <span class="s2">&quot;Recurrent or input weights are not finalized, </span><span class="se">\</span>
+<span class="s2">            call finalize_connectivity() in your custom model definition&quot;</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">inp</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;input must be 3 dimensional, </span><span class="se">\</span>
+<span class="s2">                            [batch, time, units] for batch_first=True, </span><span class="se">\</span>
+<span class="s2">                            and [time, batch, units] otherwise].&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">x0</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;x0 must be 2 dimensional, [batch, units].&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">W_rec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Apply Dale&#39;s Law if constrained</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rec_constrained</span><span class="p">:</span>
+                <span class="n">W_rec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_dales_law</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">W_rec</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_mask</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_sign_matrix</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">W_rec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_rec_mask</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Ensure provided W_rec is on correct device and dtype</span>
+            <span class="n">W_rec</span> <span class="o">=</span> <span class="n">W_rec</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">W_rec</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">x0</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+                <span class="n">W_rec</span> <span class="o">=</span> <span class="n">W_rec</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">x0</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">W_inp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Apply to input weights as well</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">inp_constrained</span><span class="p">:</span>
+                <span class="n">W_inp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_dales_law</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">W_inp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_inp_mask</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_inp_sign_matrix</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">W_inp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_inp</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_inp_mask</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">W_inp</span> <span class="o">=</span> <span class="n">W_inp</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">W_inp</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">x0</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+                <span class="n">W_inp</span> <span class="o">=</span> <span class="n">W_inp</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">x0</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="n">baseline_inp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tonic_inp</span><span class="p">()</span>
+
+        <span class="n">xn_next</span> <span class="o">=</span> <span class="n">x0</span>
+        <span class="n">hn_next</span> <span class="o">=</span> <span class="n">h0</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_first</span><span class="p">:</span>
+            <span class="c1"># If batch first then batch is first dim of inp</span>
+            <span class="n">seq_len</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">batch_shape</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="c1"># Create lists for xs and hns</span>
+            <span class="n">new_hs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">batch_shape</span><span class="p">,</span> <span class="n">seq_len</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+            <span class="p">)</span>
+            <span class="n">new_xs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">batch_shape</span><span class="p">,</span> <span class="n">seq_len</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+            <span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">seq_len</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">batch_shape</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="c1"># Create lists for xs and hns</span>
+            <span class="n">new_hs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">seq_len</span><span class="p">,</span> <span class="n">batch_shape</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+            <span class="p">)</span>
+            <span class="n">new_xs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">seq_len</span><span class="p">,</span> <span class="n">batch_shape</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Process sequence</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">seq_len</span><span class="p">):</span>
+            <span class="c1"># Gather input at current timestep</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_first</span><span class="p">:</span>
+                <span class="n">inp_t</span> <span class="o">=</span> <span class="n">inp</span><span class="p">[:,</span> <span class="n">t</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">inp_t</span> <span class="o">=</span> <span class="n">inp</span><span class="p">[</span><span class="n">t</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
+
+            <span class="c1"># Calculate noise terms</span>
+            <span class="k">if</span> <span class="n">noise</span><span class="p">:</span>
+                <span class="c1"># Calculate noise constants</span>
+                <span class="n">const_hid</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
+                    <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma_recur</span><span class="o">**</span><span class="mi">2</span>
+                <span class="p">)</span>
+                <span class="n">const_inp</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
+                    <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma_input</span><span class="o">**</span><span class="mi">2</span>
+                <span class="p">)</span>
+                <span class="c1"># Sample from normal distribution and scale by constant term</span>
+                <span class="c1"># Separate noise levels will be applied to each neuron/input</span>
+                <span class="n">perturb_hid</span> <span class="o">=</span> <span class="n">const_hid</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span>
+                    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">batch_shape</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+                <span class="p">)</span>
+                <span class="n">perturb_inp</span> <span class="o">=</span> <span class="n">const_inp</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span>
+                    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">batch_shape</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_inputs</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">perturb_hid</span> <span class="o">=</span> <span class="n">perturb_inp</span> <span class="o">=</span> <span class="mi">0</span>
+
+            <span class="c1"># Update hidden state</span>
+            <span class="c1"># Discretized equation of the form: x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)</span>
+            <span class="n">xn_next</span> <span class="o">=</span> <span class="n">xn_next</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">*</span> <span class="p">(</span>
+                <span class="o">-</span><span class="n">xn_next</span> <span class="o">+</span> <span class="p">(</span><span class="n">W_rec</span> <span class="o">@</span> <span class="n">hn_next</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">T</span> <span class="o">+</span> <span class="n">baseline_inp</span> <span class="o">+</span> <span class="n">perturb_hid</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Add input</span>
+            <span class="n">xn_next</span> <span class="o">=</span> <span class="n">xn_next</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">*</span> <span class="p">(</span><span class="n">W_inp</span> <span class="o">@</span> <span class="p">(</span><span class="n">inp_t</span> <span class="o">+</span> <span class="n">perturb_inp</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_first</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)):</span>
+                    <span class="n">xn_next</span> <span class="o">=</span> <span class="n">xn_next</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">*</span> <span class="n">args</span><span class="p">[</span><span class="n">idx</span><span class="p">][:,</span> <span class="n">t</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)):</span>
+                    <span class="n">xn_next</span> <span class="o">=</span> <span class="n">xn_next</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">*</span> <span class="n">args</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="n">t</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
+
+            <span class="c1"># Compute activation</span>
+            <span class="c1"># Gather activation and pre-activation into lists</span>
+            <span class="c1"># Activation of the form: h_t = sigma(x_t)</span>
+            <span class="n">hn_next</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="n">xn_next</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_first</span><span class="p">:</span>
+                <span class="n">new_xs</span><span class="p">[:,</span> <span class="n">t</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">xn_next</span>
+                <span class="n">new_hs</span><span class="p">[:,</span> <span class="n">t</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">hn_next</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">new_xs</span><span class="p">[</span><span class="n">t</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">xn_next</span>
+                <span class="n">new_hs</span><span class="p">[</span><span class="n">t</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">hn_next</span>
+
+        <span class="k">return</span> <span class="n">new_xs</span><span class="p">,</span> <span class="n">new_hs</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_def_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate default values for configuration</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config (json): Network configuration file</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Set default values for recurrent region connections</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">region</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;recurrent_regions&quot;</span><span class="p">]):</span>
+            <span class="c1"># Go through all possible default options in default dict</span>
+            <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">:</span>
+                <span class="c1"># If the parameter is not specified by the user in the configuration...</span>
+                <span class="k">if</span> <span class="n">param</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">region</span><span class="p">:</span>
+                    <span class="c1"># If parameter is name, add the index to ensure unique naming</span>
+                    <span class="k">if</span> <span class="n">param</span> <span class="o">==</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span>
+                        <span class="n">region</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                    <span class="c1"># Otherwise, default the parameter</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">region</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_REC_REGIONS</span><span class="p">[</span><span class="n">param</span><span class="p">]</span>
+
+        <span class="c1"># Set default values for recurrent region connections</span>
+        <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;recurrent_connections&quot;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">DEFAULT_CONNECTIONS</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">param</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">connection</span><span class="p">:</span>
+                    <span class="n">connection</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_CONNECTIONS</span><span class="p">[</span><span class="n">param</span><span class="p">]</span>
+
+        <span class="c1"># Set default values for input regions</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">region</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;input_regions&quot;</span><span class="p">]):</span>
+            <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">DEFAULT_REGION_BASE</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">param</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">region</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">param</span> <span class="o">==</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span>
+                        <span class="n">region</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_REGION_BASE</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">region</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_REGION_BASE</span><span class="p">[</span><span class="n">param</span><span class="p">]</span>
+
+        <span class="c1"># Set default values for input region connections</span>
+        <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;input_connections&quot;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">DEFAULT_CONNECTIONS</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">param</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">connection</span><span class="p">:</span>
+                    <span class="n">connection</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_CONNECTIONS</span><span class="p">[</span><span class="n">param</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_gen_region_mask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">region</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a mask for a specific region and optionally a cell type.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            region (str): Region name</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Binary mask</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">next_region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">region</span> <span class="o">==</span> <span class="n">next_region</span><span class="p">:</span>
+                <span class="n">mask</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span><span class="o">.</span><span class="n">masks</span><span class="p">[</span><span class="s2">&quot;ones&quot;</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mask</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">next_region</span><span class="p">]</span><span class="o">.</span><span class="n">masks</span><span class="p">[</span><span class="s2">&quot;zeros&quot;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_full_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">region</span><span class="p">:</span> <span class="n">Region</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Ensures all possible connections are defined for a region, adding zero</span>
+<span class="sd">        connections where none are specified.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            region (Region): Region object to complete connections for</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">other_region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">region</span><span class="o">.</span><span class="n">has_connection_to</span><span class="p">(</span><span class="n">other_region</span><span class="p">):</span>
+                <span class="n">region</span><span class="o">.</span><span class="n">add_connection</span><span class="p">(</span>
+                    <span class="n">dst_region_name</span><span class="o">=</span><span class="n">other_region</span><span class="p">,</span>
+                    <span class="n">dst_region_units</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">other_region</span><span class="p">]</span><span class="o">.</span><span class="n">num_units</span><span class="p">,</span>
+                    <span class="n">sparsity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">zero_connection</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_total_num_units</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dict_</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculates total number of units across all regions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dict_ (dict): either region_dict or inp_dict</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Total number of units</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">region</span><span class="o">.</span><span class="n">num_units</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_if_parent_region</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_region</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return True if any region has ``parent_region`` set to the given name.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            parent_region (str): name of parent region</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: whether or not parent_region is a parent region</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">region</span><span class="o">.</span><span class="n">parent_region</span> <span class="o">==</span> <span class="n">parent_region</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_child_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_region</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a tuple of region names that list ``parent_region`` as their parent.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            parent_region (str): name of parent region</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: names of all child regions under parent region</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">child_region_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span><span class="p">[</span><span class="n">region</span><span class="p">]</span><span class="o">.</span><span class="n">parent_region</span> <span class="o">==</span> <span class="n">parent_region</span><span class="p">:</span>
+                <span class="n">child_region_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">region</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">child_region_list</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_constrained_default_init_rec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">weight</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Default init for recurrent weights under Dale&#39;s Law constraints.</span>
+
+<span class="sd">        Draws weights from a zero-mean normal with variance 1/(2H), then applies</span>
+<span class="sd">        a sign mask to respect excitation/inhibition of source regions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">normal_</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span> <span class="n">mean</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">std</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span><span class="p">)))</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+        <span class="n">weight</span> <span class="o">*=</span> <span class="n">mask</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_constrained_default_init_inp</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">weight</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Default init for input weights under Dale&#39;s Law constraints.</span>
+
+<span class="sd">        Draws weights from a zero-mean normal with variance 1/(H + I), then</span>
+<span class="sd">        applies a sign mask to respect region sign.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">normal_</span><span class="p">(</span>
+            <span class="n">weight</span><span class="p">,</span>
+            <span class="n">mean</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+            <span class="n">std</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">total_num_units</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_num_inputs</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+        <span class="n">weight</span> <span class="o">*=</span> <span class="n">mask</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_order</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reorder args if given regions are out of order&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_dict</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">mRNNTorch</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, John Lazzari.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

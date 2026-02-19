@@ -1,0 +1,454 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mrnntorch &mdash; mRNNTorch 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="input_region" href="mrnntorch.region.html" />
+    <link rel="prev" title="mRNNTorch" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            mRNNTorch
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">mrnntorch</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#region">region</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.region.html">input_region</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.region.html#module-mrnntorch.region.recurrent_region">recurrent_region</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.region.html#module-mrnntorch.region.region_base">region_base</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#analysis">analysis</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.html">fixed_points</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.html#flow-fields">flow_fields</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.html#linear">linear</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mrnntorch.analysis.html#utils">utils</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mrnntorch.mRNN">mrnntorch.mRNN</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#mrnntorch.mRNN.linear"><code class="docutils literal notranslate"><span class="pre">linear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mrnntorch.mRNN.mRNN"><code class="docutils literal notranslate"><span class="pre">mRNN</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.add_input_connection"><code class="docutils literal notranslate"><span class="pre">mRNN.add_input_connection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.add_input_region"><code class="docutils literal notranslate"><span class="pre">mRNN.add_input_region()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.add_recurrent_connection"><code class="docutils literal notranslate"><span class="pre">mRNN.add_recurrent_connection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.add_recurrent_region"><code class="docutils literal notranslate"><span class="pre">mRNN.add_recurrent_region()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.apply_dales_law"><code class="docutils literal notranslate"><span class="pre">mRNN.apply_dales_law()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.compute_spectral_radius"><code class="docutils literal notranslate"><span class="pre">mRNN.compute_spectral_radius()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.finalize_connectivity"><code class="docutils literal notranslate"><span class="pre">mRNN.finalize_connectivity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.finalize_inp_connectivity"><code class="docutils literal notranslate"><span class="pre">mRNN.finalize_inp_connectivity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.finalize_rec_connectivity"><code class="docutils literal notranslate"><span class="pre">mRNN.finalize_rec_connectivity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.forward"><code class="docutils literal notranslate"><span class="pre">mRNN.forward()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.gen_w"><code class="docutils literal notranslate"><span class="pre">mRNN.gen_w()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.get_initial_condition"><code class="docutils literal notranslate"><span class="pre">mRNN.get_initial_condition()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.get_projection"><code class="docutils literal notranslate"><span class="pre">mRNN.get_projection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.get_region_activity"><code class="docutils literal notranslate"><span class="pre">mRNN.get_region_activity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.get_region_indices"><code class="docutils literal notranslate"><span class="pre">mRNN.get_region_indices()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.get_region_size"><code class="docutils literal notranslate"><span class="pre">mRNN.get_region_size()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.get_tonic_inp"><code class="docutils literal notranslate"><span class="pre">mRNN.get_tonic_inp()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.get_weight_subset"><code class="docutils literal notranslate"><span class="pre">mRNN.get_weight_subset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.named_inp_regions"><code class="docutils literal notranslate"><span class="pre">mRNN.named_inp_regions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.named_rec_regions"><code class="docutils literal notranslate"><span class="pre">mRNN.named_rec_regions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mrnntorch.mRNN.mRNN.set_spectral_radius"><code class="docutils literal notranslate"><span class="pre">mRNN.set_spectral_radius()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">mRNNTorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">mrnntorch</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/mrnntorch.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="mrnntorch">
+<h1>mrnntorch<a class="headerlink" href="#mrnntorch" title="Link to this heading"></a></h1>
+<section id="region">
+<h2>region<a class="headerlink" href="#region" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mrnntorch.region.html">input_region</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mrnntorch.region.html#module-mrnntorch.region.recurrent_region">recurrent_region</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mrnntorch.region.html#module-mrnntorch.region.region_base">region_base</a></li>
+</ul>
+</div>
+</section>
+<section id="analysis">
+<h2>analysis<a class="headerlink" href="#analysis" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mrnntorch.analysis.html">fixed_points</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mrnntorch.analysis.html#flow-fields">flow_fields</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mrnntorch.analysis.html#linear">linear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mrnntorch.analysis.html#utils">utils</a></li>
+</ul>
+</div>
+</section>
+<section id="module-mrnntorch.mRNN">
+<span id="mrnntorch-mrnn"></span><h2>mrnntorch.mRNN<a class="headerlink" href="#module-mrnntorch.mRNN" title="Link to this heading"></a></h2>
+<p>mRNN core module.</p>
+<p>Implements the multi-regional recurrent neural network (mRNN) building blocks
+and step-wise dynamics, along with helpers for connectivity, constraints, and
+initialization.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.linear">
+<span class="sig-prename descclassname"><span class="pre">mrnntorch.mRNN.</span></span><span class="sig-name descname"><span class="pre">linear</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#linear"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.linear" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mrnntorch.mRNN.</span></span><span class="sig-name descname"><span class="pre">mRNN</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'relu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_level_act</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_level_inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rec_constrained</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inp_constrained</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_first</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spectral_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config_finalize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cuda'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.add_input_connection">
+<span class="sig-name descname"><span class="pre">add_input_connection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparsity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.add_input_connection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.add_input_connection" title="Link to this definition"></a></dt>
+<dd><p>Create an input connection from an input region to a recurrent region.
+Currently not allowed to make a zero connection.</p>
+<dl>
+<dt>Args:</dt><dd><p>src_region (str): Source input region name.
+dst_region (str): Destination recurrent region name.
+sparsity (float | None): Fraction of connections to keep (0-1). If</p>
+<blockquote>
+<div><p>None, dense mask is used.</p>
+</div></blockquote>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.add_input_region">
+<span class="sig-name descname"><span class="pre">add_input_region</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_units</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sign</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pos'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cuda'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.add_input_region"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.add_input_region" title="Link to this definition"></a></dt>
+<dd><p>Add an input region to the network.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>name (str): Input region name (unique key).
+num_units (int): Number of input channels in this region.
+sign (str): “pos” or “neg”; used to set sign mask for inputs.
+device (str): Device where tensors for this region live.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.add_recurrent_connection">
+<span class="sig-name descname"><span class="pre">add_recurrent_connection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparsity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.add_recurrent_connection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.add_recurrent_connection" title="Link to this definition"></a></dt>
+<dd><p>Create a recurrent connection from one region to another.</p>
+<p>Registers the weight parameter and associated masks. If <code class="docutils literal notranslate"><span class="pre">sparsity</span></code> is
+provided, a binary connectivity mask is sampled accordingly.</p>
+<p>Currently not allowed to make a zero connection.</p>
+<dl>
+<dt>Args:</dt><dd><p>src_region (str): Source recurrent region name.
+dst_region (str): Destination recurrent region name.
+sparsity (float | None): Fraction of connections to keep (0-1). If</p>
+<blockquote>
+<div><p>None, dense mask is used.</p>
+</div></blockquote>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.add_recurrent_region">
+<span class="sig-name descname"><span class="pre">add_recurrent_region</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_units</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sign</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pos'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_firing</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cuda'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">learnable_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.add_recurrent_region"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.add_recurrent_region" title="Link to this definition"></a></dt>
+<dd><p>Add a recurrent region to the network.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>name (str): Region name (unique key).
+num_units (int): Number of units in this region.
+sign (str): “pos” for excitatory or “neg” for inhibitory outputs.
+base_firing (float | torch.Tensor): Baseline firing per unit.
+init (float): Initial pre-activation value for units in this region.
+device (str): Device where tensors for this region live.
+parent_region (str | None): Optional parent region identifier.
+learnable_bias (bool): If True, baseline firing is trainable.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.apply_dales_law">
+<span class="sig-name descname"><span class="pre">apply_dales_law</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W_rec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_rec_mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_rec_sign_matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.apply_dales_law"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.apply_dales_law" title="Link to this definition"></a></dt>
+<dd><p>Applies Dale’s Law constraints to the recurrent weight matrix.
+Dale’s Law states that a neuron can be either excitatory or inhibitory, but not both.</p>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>torch.Tensor: Constrained weight matrix</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.compute_spectral_radius">
+<span class="sig-name descname"><span class="pre">compute_spectral_radius</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.compute_spectral_radius"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.compute_spectral_radius" title="Link to this definition"></a></dt>
+<dd><p>Compute the spectral radius (max <a href="#id3"><span class="problematic" id="id4">|eigenvalue|</span></a>) of a square matrix.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>weight (torch.Tensor): Square weight matrix.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: Spectral radius as a scalar tensor.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.finalize_connectivity">
+<span class="sig-name descname"><span class="pre">finalize_connectivity</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.finalize_connectivity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.finalize_connectivity" title="Link to this definition"></a></dt>
+<dd><p>Finalize both input and recurrent connectivity
+This function is primarily implemented so users don’t have to
+separately call rec and inp connectivity functions</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.finalize_inp_connectivity">
+<span class="sig-name descname"><span class="pre">finalize_inp_connectivity</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.finalize_inp_connectivity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.finalize_inp_connectivity" title="Link to this definition"></a></dt>
+<dd><p>Fill rest of input connections with zeros
+Ensure finalized flag is set to true</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.finalize_rec_connectivity">
+<span class="sig-name descname"><span class="pre">finalize_rec_connectivity</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.finalize_rec_connectivity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.finalize_rec_connectivity" title="Link to this definition"></a></dt>
+<dd><p>Fill rest of recurrent connections with zeros
+Ensure finalized flag is set to true</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_rec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_inp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.forward" title="Link to this definition"></a></dt>
+<dd><p>Run the recurrent dynamics over a sequence.</p>
+<p>Discretized update: <code class="docutils literal notranslate"><span class="pre">x_{t+1}</span> <span class="pre">=</span> <span class="pre">x_t</span> <span class="pre">+</span> <span class="pre">alpha</span> <span class="pre">*</span> <span class="pre">(-x_t</span> <span class="pre">+</span> <span class="pre">W_rec</span> <span class="pre">h_t</span> <span class="pre">+</span> <span class="pre">W_inp</span> <span class="pre">u_t</span> <span class="pre">+</span> <span class="pre">b</span> <span class="pre">+</span> <span class="pre">noise)</span></code>
+and <code class="docutils literal notranslate"><span class="pre">h_{t+1}</span> <span class="pre">=</span> <span class="pre">activation(x_{t+1})</span></code>.</p>
+<dl>
+<dt>Args:</dt><dd><dl class="simple">
+<dt>inp (torch.Tensor): Input sequence. Shape <code class="docutils literal notranslate"><span class="pre">[B,</span> <span class="pre">T,</span> <span class="pre">I]</span></code> if batch_first</dt><dd><p>else <code class="docutils literal notranslate"><span class="pre">[T,</span> <span class="pre">B,</span> <span class="pre">I]</span></code>.</p>
+</dd>
+</dl>
+<p>x0 (torch.Tensor): Initial pre-activation hidden state, shape <code class="docutils literal notranslate"><span class="pre">[B,</span> <span class="pre">H]</span></code>.
+h0 (torch.Tensor): Initial activation, shape <code class="docutils literal notranslate"><span class="pre">[B,</span> <span class="pre">H]</span></code>.
+<a href="#id1"><span class="problematic" id="id2">*</span></a>args (torch.Tensor): Optional additive inputs with same temporal layout</p>
+<blockquote>
+<div><p>as <code class="docutils literal notranslate"><span class="pre">inp</span></code> and feature size <code class="docutils literal notranslate"><span class="pre">H</span></code>.</p>
+</div></blockquote>
+<p>noise (bool): If True, add Gaussian noise to hidden state and inputs.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple[torch.Tensor, torch.Tensor]: <code class="docutils literal notranslate"><span class="pre">(x_seq,</span> <span class="pre">h_seq)</span></code> sequences matching
+the temporal layout of <code class="docutils literal notranslate"><span class="pre">inp</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.gen_w">
+<span class="sig-name descname"><span class="pre">gen_w</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dict_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.gen_w"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.gen_w" title="Link to this definition"></a></dt>
+<dd><p>Generates the full recurrent connectivity matrix and associated masks.</p>
+<dl class="simple">
+<dt>Returns:</dt><dd><dl class="simple">
+<dt>tuple: (W_rec, W_rec_mask, W_rec_sign_matrix)</dt><dd><ul class="simple">
+<li><p>W_rec: Learnable weight matrix</p></li>
+<li><p>W_rec_mask: Binary mask for allowed connections</p></li>
+<li><p>W_rec_sign_matrix: Sign constraints for Dale’s Law</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.get_initial_condition">
+<span class="sig-name descname"><span class="pre">get_initial_condition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.get_initial_condition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.get_initial_condition" title="Link to this definition"></a></dt>
+<dd><p>Create an initial xn for the network</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>xn (Tensor): empty or zero tensor to hold initial condition</p>
+</dd>
+<dt>Returns:</dt><dd><p>Tensor: tensor like xn filled with region specified initial conds</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.get_projection">
+<span class="sig-name descname"><span class="pre">get_projection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">to</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">from_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.get_projection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.get_projection" title="Link to this definition"></a></dt>
+<dd><p>Gather a subset of the weights</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>to (str): Name of region that is recieving projection (row)
+<a href="#id5"><span class="problematic" id="id6">from_</span></a> (str): Name of region projecting (column)</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: weight matrix of <a href="#id7"><span class="problematic" id="id8">from_</span></a>-&gt;to projection</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.get_region_activity">
+<span class="sig-name descname"><span class="pre">get_region_activity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">act</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.get_region_activity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.get_region_activity" title="Link to this definition"></a></dt>
+<dd><p>Takes in hn and the specified region and returns the activity hn for the corresponding region</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>act (Torch.Tensor): tensor containing model hidden activity. Activations must be in last dimension (-1)
+args (str): name of regions to collect activity from</p>
+</dd>
+<dt>Returns:</dt><dd><p>region_hn: tensor containing hidden activity only for specified region</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.get_region_indices">
+<span class="sig-name descname"><span class="pre">get_region_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.get_region_indices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.get_region_indices" title="Link to this definition"></a></dt>
+<dd><p>Gets the start and end indices for a specific region in the hidden state vector.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>region (str): Name of the region</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple: (start_idx, end_idx)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.get_region_size">
+<span class="sig-name descname"><span class="pre">get_region_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.get_region_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.get_region_size" title="Link to this definition"></a></dt>
+<dd><p>Get the number of units in a region(s)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.get_tonic_inp">
+<span class="sig-name descname"><span class="pre">get_tonic_inp</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.get_tonic_inp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.get_tonic_inp" title="Link to this definition"></a></dt>
+<dd><p>Collects baseline firing rates for all regions.</p>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>torch.Tensor: Vector of baseline firing rates</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.get_weight_subset">
+<span class="sig-name descname"><span class="pre">get_weight_subset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.get_weight_subset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.get_weight_subset" title="Link to this definition"></a></dt>
+<dd><p>Gather a subset of the weights from all regions in args to and from
+each other and themselves.</p>
+<p>This should return a square matrix of all connections between regions in
+args</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>args (str): all regions specified
+W (torch.Tensor): use this specified weight matrix instead</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: subset of the total weight matrix</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.named_inp_regions">
+<span class="sig-name descname"><span class="pre">named_inp_regions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.named_inp_regions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.named_inp_regions" title="Link to this definition"></a></dt>
+<dd><p>Loop through inp region names and objects</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>prefix (str, optional): Defaults to ‘’.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.named_rec_regions">
+<span class="sig-name descname"><span class="pre">named_rec_regions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.named_rec_regions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.named_rec_regions" title="Link to this definition"></a></dt>
+<dd><p>Loop through rec region names and objects</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>prefix (str, optional): Defaults to ‘’.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mrnntorch.mRNN.mRNN.set_spectral_radius">
+<span class="sig-name descname"><span class="pre">set_spectral_radius</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_tmp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/mrnntorch/mRNN.html#mRNN.set_spectral_radius"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mrnntorch.mRNN.mRNN.set_spectral_radius" title="Link to this definition"></a></dt>
+<dd><p>Scale recurrent weights so their spectral radius matches <code class="docutils literal notranslate"><span class="pre">self.spectral_radius</span></code>.</p>
+<p>Usage:
+1. Define regions and connections (via config or manual methods).
+2. If building manually, call <a class="reference internal" href="#mrnntorch.mRNN.mRNN.finalize_connectivity" title="mrnntorch.mRNN.mRNN.finalize_connectivity"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finalize_connectivity()</span></code></a> first.
+3. Set <code class="docutils literal notranslate"><span class="pre">self.spectral_radius</span></code> and call this method.
+4. W_tmp will compute spectral radius of another network (i.e dales law network)</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="mRNNTorch" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="mrnntorch.region.html" class="btn btn-neutral float-right" title="input_region" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, John Lazzari.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
