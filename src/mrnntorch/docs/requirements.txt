@@ -2,6 +2,6 @@ sphinx>=7
 sphinx-rtd-theme>=2
 numpy
 torch
-sklearn
+scikit-learn
 scipy
 matplotlib
