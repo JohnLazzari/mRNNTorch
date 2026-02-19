@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from sklearn.decomposition import PCA
-from tqdm import tqdm
+from numpy.typing import NDArray
 from mrnntorch.analysis.linear.linearization import Linearization
 from mrnntorch.analysis.flow_fields.flow_field import FlowField
 from mrnntorch.mRNN import mRNN
@@ -255,7 +255,7 @@ class FlowFieldFinder:
 
         return flow_field_list
 
-    def _reduce_traj(self, trajectory: torch.Tensor, *args) -> np.Array:
+    def _reduce_traj(self, trajectory: torch.Tensor, *args) -> NDArray:
         """
         Fit PCA object and transform trajectory
 
