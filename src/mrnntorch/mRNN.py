@@ -8,7 +8,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 import json
+from typing import Tuple
 from collections import OrderedDict
+import warnings
 from mrnntorch.region.region_base import Region
 from mrnntorch.region.recurrent_region import RecurrentRegion
 from mrnntorch.region.input_region import InputRegion
@@ -90,7 +92,6 @@ class mRNN(nn.Module):
             device (str): Torch device string (e.g., "cpu" or "cuda"). Default: "cuda".
         """
 
-        # TODO potentially add getitem and setitem with str indexing
         # Initialize network parameters
         self.region_dict = {}
         self.inp_dict = {}
@@ -814,13 +815,32 @@ class mRNN(nn.Module):
             self.device
         )
 
+    def batched_initial_condition(
+        self, batch_size: int
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Return initial condition expanded to meet batch_size
+
+        Args:
+            batch_size (int): batch size to expand to
+
+        Returns:
+            xn, hn (Tensor, Tensor): initial preactivation and hidden activation
+        """
+        xn = self.initial_condition.unsqueeze(0).repeat(batch_size, 1)
+        hn = self.initial_condition.unsqueeze(0).repeat(batch_size, 1)
+        return xn, hn
+
     def forward(
         self,
         inp: torch.Tensor,
         x0: torch.Tensor,
         h0: torch.Tensor,
         *args,
-        noise: bool = True,
+        noise: bool = False,
+        tv_noise: bool = False,
+        tv_noise_scale: float = 0.1,
+        start_noise: torch.Tensor | None = None,
         W_rec: torch.Tensor | None = None,
         W_inp: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -849,6 +869,18 @@ class mRNN(nn.Module):
             call finalize_connectivity() in your custom model definition"
         )
 
+        # warnings and assertions for noise parameters
+        if tv_noise and not noise:
+            warnings.warn(
+                "tv_noise set to True and noise is False, no noise \
+                will be applied to the network"
+            )
+        if start_noise is not None and not noise:
+            warnings.warn(
+                "start_noise is not None and noise is False, no noise \
+                will be applied to the network"
+            )
+
         if inp.dim() != 3:
             raise Exception(
                 "input must be 3 dimensional, \
@@ -866,11 +898,6 @@ class mRNN(nn.Module):
                 )
             else:
                 W_rec = self.W_rec * self.W_rec_mask
-        else:
-            # Ensure provided W_rec is on correct device and dtype
-            W_rec = W_rec.to(self.device)
-            if W_rec.dtype != x0.dtype:
-                W_rec = W_rec.to(x0.dtype)
 
         if W_inp is None:
             # Apply to input weights as well
@@ -880,10 +907,6 @@ class mRNN(nn.Module):
                 )
             else:
                 W_inp = self.W_inp * self.W_inp_mask
-        else:
-            W_inp = W_inp.to(self.device)
-            if W_inp.dtype != x0.dtype:
-                W_inp = W_inp.to(x0.dtype)
 
         baseline_inp = self.tonic_inp
 
@@ -891,27 +914,19 @@ class mRNN(nn.Module):
         hn_next = h0
 
         if self.batch_first:
-            # If batch first then batch is first dim of inp
-            seq_len = inp.shape[1]
+            # If batch first then batch is first dim
             batch_shape = inp.shape[0]
-            # Create lists for xs and hns
-            new_hs = torch.empty(
-                size=(batch_shape, seq_len, self.total_num_units), device=self.device
-            )
-            new_xs = torch.empty(
-                size=(batch_shape, seq_len, self.total_num_units), device=self.device
-            )
-
+            seq_len = inp.shape[1]
+            shape = (batch_shape, seq_len, self.total_num_units)
         else:
+            # If not batch first then seq_len is first dim
             seq_len = inp.shape[0]
             batch_shape = inp.shape[1]
-            # Create lists for xs and hns
-            new_hs = torch.empty(
-                size=(seq_len, batch_shape, self.total_num_units), device=self.device
-            )
-            new_xs = torch.empty(
-                size=(seq_len, batch_shape, self.total_num_units), device=self.device
-            )
+            shape = (seq_len, batch_shape, self.total_num_units)
+
+        # Create lists for xs and hns
+        new_hs = torch.empty(size=shape, device=self.device)
+        new_xs = torch.empty(size=shape, device=self.device)
 
         # Process sequence
         for t in range(seq_len):
@@ -921,35 +936,41 @@ class mRNN(nn.Module):
             else:
                 inp_t = inp[t, :, :]
 
-            # Calculate noise terms
+            # Sample from normal distribution and scale by constant term
             if noise:
-                # Calculate noise constants
-                const_hid = (1 / self.alpha) * np.sqrt(
-                    2 * self.alpha * self.sigma_recur**2
-                )
-                const_inp = (1 / self.alpha) * np.sqrt(
-                    2 * self.alpha * self.sigma_input**2
-                )
-                # Sample from normal distribution and scale by constant term
                 # Separate noise levels will be applied to each neuron/input
-                perturb_hid = const_hid * torch.randn(
-                    size=(batch_shape, self.total_num_units), device=self.device
-                )
-                perturb_inp = const_inp * torch.randn(
-                    size=(batch_shape, self.total_num_inputs), device=self.device
-                )
+                hid_noise = self._hid_noise(self.hid_noise_const, batch_shape)
+                inp_noise = self._inp_noise(self.inp_noise_const, batch_shape)
             else:
-                perturb_hid = perturb_inp = 0
+                hid_noise = inp_noise = 0
 
-            # Update hidden state
-            # Discretized equation of the form: x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)
+            # tv noise is only an option if noise is set to True
+            if tv_noise and noise:
+                hid_noise = hid_noise / (1 + (t * tv_noise_scale))
+                inp_noise = inp_noise / (1 + (t * tv_noise_scale))
+
+            # start_noise only an option if noise is True
+            if start_noise is not None and noise:
+                start_mask = (
+                    torch.where(start_noise > t, 0, 1).unsqueeze(1).to(self.device)
+                )
+                hid_noise = hid_noise * start_mask
+                inp_noise = inp_noise * start_mask
+
+            """
+            Update hidden state
+            Discretized equation of the form: 
+                x_(t+1) = x_t + alpha * (-x_t + Wh + W_ix + b)
+            """
+
             xn_next = xn_next + self.alpha * (
-                -xn_next + (W_rec @ hn_next.T).T + baseline_inp + perturb_hid
+                -xn_next + (W_rec @ hn_next.T).T + baseline_inp + hid_noise
             )
 
             # Add input
-            xn_next = xn_next + self.alpha * (W_inp @ (inp_t + perturb_inp).T).T
+            xn_next = xn_next + self.alpha * (W_inp @ (inp_t + inp_noise).T).T
 
+            # Add any additional arg inputs (stim inputs typically)
             if self.batch_first:
                 for idx in range(len(args)):
                     xn_next = xn_next + self.alpha * args[idx][:, t, :]
@@ -957,9 +978,12 @@ class mRNN(nn.Module):
                 for idx in range(len(args)):
                     xn_next = xn_next + self.alpha * args[idx][t, :, :]
 
-            # Compute activation
-            # Gather activation and pre-activation into lists
-            # Activation of the form: h_t = sigma(x_t)
+            """
+            Compute activation
+            Activation of the form: 
+                h_t = sigma(x_t)
+            """
+
             hn_next = self.activation(xn_next)
 
             if self.batch_first:
@@ -970,6 +994,50 @@ class mRNN(nn.Module):
                 new_hs[t, :, :] = hn_next
 
         return new_xs, new_hs
+
+    @property
+    def hid_noise_const(self):
+        """noise constant used for hidden activity"""
+        const_hid = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_recur**2)
+        return const_hid
+
+    @property
+    def inp_noise_const(self):
+        """noise constant used for inputs"""
+        const_inp = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_input**2)
+        return const_inp
+
+    def _hid_noise(self, const: float, batch_shape: int):
+        """
+        Gather a random noise sample at a given timepoint
+
+        Args:
+            const (float): hidden noise constant
+            batch_shape (int): batch_shape
+
+        Returns:
+            Tensor: total_num_units sized tensor containing Gaussian noise
+        """
+        perturb_hid = const * torch.randn(
+            size=(batch_shape, self.total_num_units), device=self.device
+        )
+        return perturb_hid
+
+    def _inp_noise(self, const, batch_shape):
+        """
+        Gather a random noise sample at a given timepoint
+
+        Args:
+            const (float): hidden noise constant
+            batch_shape (int): batch_shape
+
+        Returns:
+            Tensor: total_num_inputs sized tensor containing Gaussian noise
+        """
+        perturb_inp = const * torch.randn(
+            size=(batch_shape, self.total_num_inputs), device=self.device
+        )
+        return perturb_inp
 
     def _create_def_values(self, config: dict):
         """Generate default values for configuration
