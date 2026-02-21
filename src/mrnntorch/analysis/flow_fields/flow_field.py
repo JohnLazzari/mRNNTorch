@@ -40,6 +40,16 @@ class FlowField:
         self.grid_columns = self.grid.shape[1]
         self.state_size = self.grid.shape[2]
 
+        # max vels and speeds
+        self.max_x_vel = torch.max(self.x_vels).item()
+        self.max_y_vel = torch.max(self.y_vels).item()
+        self.max_speed = torch.max(self.speeds).item()
+
+        # min vels and speeds
+        self.min_x_vel = torch.min(self.x_vels).item()
+        self.min_y_vel = torch.min(self.y_vels).item()
+        self.min_speed = torch.min(self.speeds).item()
+
     def __getitem__(
         self,
         idx: int

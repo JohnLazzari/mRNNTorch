@@ -28,7 +28,7 @@ class FlowFieldFinder:
         y_offset: int = _default_hps["y_offset"],
         cancel_other_regions: bool = _default_hps["cancel_other_regions"],
         follow_traj: bool = _default_hps["follow_traj"],
-        dtype: float = _default_hps["dtype"],
+        dtype=_default_hps["dtype"],
     ):
         """
         Flow field that gathers a flow field about a specified trajectory
@@ -59,8 +59,9 @@ class FlowFieldFinder:
         states: torch.Tensor,
         inp: torch.Tensor,
         *args,
-        stim_input: torch.Tensor = None,
-        W: torch.Tensor = None,
+        verbose: bool = False,
+        stim_input: torch.Tensor | None = None,
+        W: torch.Tensor | None = None,
     ) -> list:
         """Compute 2D flow fields in a region subspace along a trajectory.
 
@@ -113,13 +114,29 @@ class FlowFieldFinder:
         lower_bound_y = -self.y_offset
         upper_bound_y = self.y_offset
 
+        max_x_vels, max_y_vels, max_speeds = [], [], []
+        min_x_vels, min_y_vels, min_speeds = [], [], []
+
         # Now going through trajectory
         for n in range(1, n_states):
+            """
+            This loop will compute a single flow field for state n 
+            This FlowField object will then be added to a list 
+            """
+
             if self.follow_traj:
-                lower_bound_x = np.round(reduced_traj[n, 0] - self.x_offset, decimals=1)
-                upper_bound_x = np.round(reduced_traj[n, 0] + self.x_offset, decimals=1)
-                lower_bound_y = np.round(reduced_traj[n, 1] - self.y_offset, decimals=1)
-                upper_bound_y = np.round(reduced_traj[n, 1] + self.y_offset, decimals=1)
+                lower_bound_x = torch.round(
+                    reduced_traj[n, 0] - self.x_offset, decimals=1
+                ).item()
+                upper_bound_x = torch.round(
+                    reduced_traj[n, 0] + self.x_offset, decimals=1
+                ).item()
+                lower_bound_y = torch.round(
+                    reduced_traj[n, 1] - self.y_offset, decimals=1
+                ).item()
+                upper_bound_y = torch.round(
+                    reduced_traj[n, 1] + self.y_offset, decimals=1
+                ).item()
 
             low_dim_grid, inverse_grid = self._inverse_grid(
                 lower_bound_x,
@@ -167,7 +184,40 @@ class FlowFieldFinder:
                 x_vel, y_vel, low_dim_grid, speed
             )
 
-            flow_field_list.append(FlowField(x_vel, y_vel, low_dim_grid, speed))
+            flow_field = FlowField(x_vel, y_vel, low_dim_grid, speed)
+            flow_field_list.append(flow_field)
+
+            # append max values to lists
+            max_x_vels.append(flow_field.max_x_vel)
+            max_y_vels.append(flow_field.max_y_vel)
+            max_speeds.append(flow_field.max_speed)
+
+            # append min values to lists
+            min_x_vels.append(flow_field.min_x_vel)
+            min_y_vels.append(flow_field.min_y_vel)
+            min_speeds.append(flow_field.min_speed)
+
+        if verbose:
+            mean_max_x_vel, std_max_x_vel = np.mean(max_x_vels), np.std(max_x_vels)
+            mean_max_y_vel, std_max_y_vel = np.mean(max_y_vels), np.std(max_y_vels)
+            mean_max_speed, std_max_speed = np.mean(max_speeds), np.std(max_speeds)
+
+            mean_min_x_vel, std_min_x_vel = np.mean(min_x_vels), np.std(min_x_vels)
+            mean_min_y_vel, std_min_y_vel = np.mean(min_x_vels), np.std(min_y_vels)
+            mean_min_speed, std_min_speed = np.mean(min_x_vels), np.std(min_speeds)
+
+            print("======================")
+            print("Flow Field Statistics:")
+            print(
+                f"mean max x vel: {mean_max_x_vel} +/- {std_max_x_vel}   mean min x vel: {mean_min_x_vel} +/- {std_min_x_vel}"
+            )
+            print(
+                f"mean max y vel: {mean_max_y_vel} +/- {std_max_y_vel}   mean min y vel: {mean_min_y_vel} +/- {std_min_y_vel}"
+            )
+            print(
+                f"mean max speed: {mean_max_speed} +/- {std_max_speed}   mean min speed: {mean_min_speed} +/- {std_min_speed}"
+            )
+            print("======================")
 
         return flow_field_list
 
@@ -214,10 +264,18 @@ class FlowFieldFinder:
             # If follow trajectory is true get grid centered around current t
             # This will make a different grid for each state (n grids)
             if self.follow_traj:
-                lower_bound_x = np.round(reduced_traj[n, 0] - self.x_offset, decimals=1)
-                upper_bound_x = np.round(reduced_traj[n, 0] + self.x_offset, decimals=1)
-                lower_bound_y = np.round(reduced_traj[n, 1] - self.y_offset, decimals=1)
-                upper_bound_y = np.round(reduced_traj[n, 1] + self.y_offset, decimals=1)
+                lower_bound_x = torch.round(
+                    reduced_traj[n, 0] - self.x_offset, decimals=1
+                ).item()
+                upper_bound_x = torch.round(
+                    reduced_traj[n, 0] + self.x_offset, decimals=1
+                ).item()
+                lower_bound_y = torch.round(
+                    reduced_traj[n, 1] - self.y_offset, decimals=1
+                ).item()
+                upper_bound_y = torch.round(
+                    reduced_traj[n, 1] + self.y_offset, decimals=1
+                ).item()
 
             # Inverse the grid to pass through RNN
             low_dim_grid, inverse_grid = self._inverse_grid(
@@ -255,7 +313,7 @@ class FlowFieldFinder:
 
         return flow_field_list
 
-    def _reduce_traj(self, trajectory: torch.Tensor, *args) -> NDArray:
+    def _reduce_traj(self, trajectory: torch.Tensor, *args) -> torch.Tensor:
         """
         Fit PCA object and transform trajectory
 
@@ -273,6 +331,7 @@ class FlowFieldFinder:
         # Do PCA on the specified region(s)
         self.reduce_obj.fit(temp_act)
         reduced_traj = self.reduce_obj.transform(temp_act)
+        reduced_traj = torch.from_numpy(reduced_traj)
 
         return reduced_traj
 
@@ -298,22 +357,20 @@ class FlowFieldFinder:
             tuple: the low dimensional and projected low dimensional grid
         """
         # Num points is along each axis, not in total
-        x = np.linspace(lower_bound_x, upper_bound_x, self.num_points)
-        y = np.linspace(lower_bound_y, upper_bound_y, self.num_points)
+        x = torch.linspace(lower_bound_x, upper_bound_x, self.num_points)
+        y = torch.linspace(lower_bound_y, upper_bound_y, self.num_points)
 
         # Gather 2D grid for flow fields
-        xv, yv = np.meshgrid(x, y)
-        xv = np.expand_dims(xv, axis=-1)
-        yv = np.expand_dims(yv, axis=-1)
+        xv, yv = torch.meshgrid(x, y, indexing="ij")
+        xv, yv = xv.unsqueeze(-1), yv.unsqueeze(-1)
 
         # Convert the grid to a tensor and flatten for PCA
-        low_dim_grid = np.concatenate((xv, yv), axis=-1)
-        low_dim_grid = torch.tensor(low_dim_grid, dtype=self.dtype)
+        low_dim_grid = torch.cat((xv, yv), dim=-1)
         low_dim_grid = torch.flatten(low_dim_grid, start_dim=0, end_dim=1)
 
         # Inverse PCA to input grid into network
         inverse_grid = self.reduce_obj.inverse_transform(low_dim_grid)
-        inverse_grid = torch.tensor(inverse_grid, dtype=self.dtype)
+        inverse_grid = inverse_grid.to(self.dtype)
 
         if expand_dims:
             low_dim_grid = torch.reshape(
