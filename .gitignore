@@ -9,6 +9,7 @@ env/
 
 # Packaging / build
 build/
+_build/
 dist/
 *.egg-info/
 

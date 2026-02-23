@@ -1,13 +1,12 @@
 import torch
 import numpy as np
-from sklearn.decomposition import PCA
-from numpy.typing import NDArray
-from mrnntorch.analysis.linear.linearization import Linearization
-from mrnntorch.analysis.flow_fields.flow_field import FlowField
+from mrnntorch.analysis.linear import mLinearization
+from dsatorch.flow_fields.flow_field import FlowField
+from dsatorch.flow_fields.flow_field_finder import FlowFieldFinder
 from mrnntorch.mRNN import mRNN
 
 
-class FlowFieldFinder:
+class mFlowFieldFinder(FlowFieldFinder[mRNN]):
     _default_hps = {
         "num_components": 2,
         "num_points": 50,
@@ -16,13 +15,12 @@ class FlowFieldFinder:
         "cancel_other_regions": False,
         "follow_traj": False,
         "name": "run",
-        "reduction_method": "pca",
         "dtype": torch.float32,
     }
 
     def __init__(
         self,
-        mrnn: mRNN,
+        rnn: mRNN,
         num_points: int = _default_hps["num_points"],
         x_offset: int = _default_hps["x_offset"],
         y_offset: int = _default_hps["y_offset"],
@@ -30,6 +28,15 @@ class FlowFieldFinder:
         follow_traj: bool = _default_hps["follow_traj"],
         dtype=_default_hps["dtype"],
     ):
+        super().__init__(
+            rnn,
+            num_points,
+            x_offset,
+            y_offset,
+            cancel_other_regions,
+            follow_traj,
+            dtype,
+        )
         """
         Flow field that gathers a flow field about a specified trajectory
 
@@ -41,27 +48,16 @@ class FlowFieldFinder:
             cancel_other_regions (bool): whether or not to zero out activity from other regions
             follow_traj (bool): whether or not to center the grid around each trajectory
         """
-        # Hyperparameters
-        self.mrnn = mrnn
-        self.num_points = num_points
-        self.x_offset = x_offset
-        self.y_offset = y_offset
-        self.cancel_other_regions = cancel_other_regions
-        self.follow_traj = follow_traj
-        self.dtype = dtype
-
-        # class objects
-        self.reduce_obj = PCA(n_components=2)
-        self.linearization = Linearization(self.mrnn)
+        self.linearization = mLinearization(rnn)
 
     def find_nonlinear_flow(
         self,
         states: torch.Tensor,
         inp: torch.Tensor,
         *args,
-        verbose: bool = False,
         stim_input: torch.Tensor | None = None,
         W: torch.Tensor | None = None,
+        **kwargs,
     ) -> list:
         """Compute 2D flow fields in a region subspace along a trajectory.
 
@@ -80,9 +76,14 @@ class FlowFieldFinder:
             list: FlowField object per sampled time.
         """
 
+        if "verbose" in kwargs:
+            verbose = kwargs["verbose"]
+        else:
+            verbose = False
+
         flow_field_list = []
 
-        if self.mrnn.batch_first:
+        if self.rnn.batch_first:
             time_dim = 1
         else:
             time_dim = 0
@@ -103,7 +104,7 @@ class FlowFieldFinder:
             stim_input = torch.flatten(stim_input, end_dim=-2)
 
         if not args:
-            region_list = [region for region in self.mrnn.region_dict]
+            region_list = [region for region in self.rnn.region_dict]
         else:
             region_list = [region for region in args]
 
@@ -161,7 +162,7 @@ class FlowFieldFinder:
                 else:
                     full_stim_batch = stim_input[n, :].repeat(low_dim_grid.shape[0], 1)
 
-                _, h = self.mrnn(
+                _, h = self.rnn(
                     full_inp_batch.unsqueeze(time_dim),
                     x_0_flow,
                     x_0_flow,
@@ -171,7 +172,7 @@ class FlowFieldFinder:
                 )
 
             # Get activity for regions of interest
-            cur_region_h = self.mrnn.get_region_activity(h, *region_list)
+            cur_region_h = self.rnn.get_region_activity(h, *region_list)
             cur_region_h = torch.reshape(cur_region_h, (-1, cur_region_h.shape[-1]))
             cur_region_h = self.reduce_obj.transform(cur_region_h)
             cur_region_h = torch.tensor(cur_region_h, dtype=self.dtype)
@@ -245,12 +246,12 @@ class FlowFieldFinder:
 
         # Gather region list from args, include all regions if args empty
         if not args:
-            region_list = [region for region in self.mrnn.region_dict]
+            region_list = [region for region in self.rnn.region_dict]
         else:
             region_list = [region for region in args]
 
         # Activity specific to regions in region list for later computations
-        region_act = self.mrnn.get_region_activity(states, *args)
+        region_act = self.rnn.get_region_activity(states, *args)
         # Reduce the regional trajectories and return pca object
         reduced_traj = self._reduce_traj(region_act, *region_list)
 
@@ -290,9 +291,7 @@ class FlowFieldFinder:
 
             with torch.no_grad():
                 # Return jacobian found from current trajectory
-                jac_rec = self.linearization.jacobian(
-                    states[n, :], *region_list, alpha=1
-                )
+                jac_rec = self.linearization.jacobian(states[n, :], *region_list)
                 # Get next h
                 h = region_act[n, :] + (jac_rec @ x_0_flow.T).T
 
@@ -325,8 +324,8 @@ class FlowFieldFinder:
             Tensor: reduced states
         """
         # Gather activity for specified region and cell type
-        temp_act = self.mrnn.get_region_activity(trajectory, *args)
-        temp_act = torch.reshape(temp_act, (-1, temp_act.shape[-1]))
+        temp_act = self.rnn.get_region_activity(trajectory, *args)
+        temp_act = torch.reshape(trajectory, (-1, trajectory.shape[-1]))
 
         # Do PCA on the specified region(s)
         self.reduce_obj.fit(temp_act)
@@ -334,53 +333,6 @@ class FlowFieldFinder:
         reduced_traj = torch.from_numpy(reduced_traj)
 
         return reduced_traj
-
-    def _inverse_grid(
-        self,
-        lower_bound_x: float,
-        upper_bound_x: float,
-        lower_bound_y: float,
-        upper_bound_y: float,
-        expand_dims: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Obtain a low dimensional grid and its projection to higher dim state
-        space
-
-        Args:
-            lower_bound_x (float): lower bound of grid in x direction
-            upper_bound_x (float): upper bound of grid in x direction
-            lower_bound_y (float): lower bound of grid in y direction
-            upper_bound_y (float): upper bound of grid in y direction
-
-        Returns:
-            tuple: the low dimensional and projected low dimensional grid
-        """
-        # Num points is along each axis, not in total
-        x = torch.linspace(lower_bound_x, upper_bound_x, self.num_points)
-        y = torch.linspace(lower_bound_y, upper_bound_y, self.num_points)
-
-        # Gather 2D grid for flow fields
-        xv, yv = torch.meshgrid(x, y, indexing="ij")
-        xv, yv = xv.unsqueeze(-1), yv.unsqueeze(-1)
-
-        # Convert the grid to a tensor and flatten for PCA
-        low_dim_grid = torch.cat((xv, yv), dim=-1)
-        low_dim_grid = torch.flatten(low_dim_grid, start_dim=0, end_dim=1)
-
-        # Inverse PCA to input grid into network
-        inverse_grid = self.reduce_obj.inverse_transform(low_dim_grid)
-        inverse_grid = inverse_grid.to(self.dtype)
-
-        if expand_dims:
-            low_dim_grid = torch.reshape(
-                low_dim_grid, (self.num_points, self.num_points, 2)
-            )
-            inverse_grid = torch.reshape(
-                inverse_grid, (self.num_points, self.num_points, inverse_grid.shape[-1])
-            )
-
-        return low_dim_grid, inverse_grid
 
     def _compute_full_trajectory(
         self, grid: torch.Tensor, full_act_batch: torch.Tensor, *args
@@ -400,62 +352,26 @@ class FlowFieldFinder:
         # Gather batches of grids with trial activity at each timestep
         grid_region_idx = 0
         x_0_flow = []
-        for region in self.mrnn.region_dict:
+        for region in self.rnn.region_dict:
             if region in args:
                 x_0_flow.append(
                     grid[
                         :,
                         grid_region_idx : grid_region_idx
-                        + self.mrnn.region_dict[region].num_units,
+                        + self.rnn.region_dict[region].num_units,
                     ]
                 )
-                grid_region_idx += self.mrnn.region_dict[region].num_units
+                grid_region_idx += self.rnn.region_dict[region].num_units
             else:
                 # Get activity for non-specified regions (either from cache or compute)
                 if self.cancel_other_regions:
                     region_activity = torch.zeros_like(
-                        self.mrnn.get_region_activity(full_act_batch, region)
+                        self.rnn.get_region_activity(full_act_batch, region)
                     )
                 else:
-                    region_activity = self.mrnn.get_region_activity(
+                    region_activity = self.rnn.get_region_activity(
                         full_act_batch, region
                     )
                 x_0_flow.append(region_activity)
         x_0_flow = torch.cat(x_0_flow, dim=-1)
         return x_0_flow
-
-    def _compute_velocity(
-        self, h_next: torch.Tensor, h_prev: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """compute velocity, or h_next - h_prev"""
-        x_vel = h_next[..., 0] - h_prev[..., 0]
-        y_vel = h_next[..., 1] - h_prev[..., 1]
-        return x_vel, y_vel
-
-    def _compute_speed(self, x_vel: torch.Tensor, y_vel: torch.Tensor) -> torch.Tensor:
-        """compute magnitude of velocities"""
-        speed = torch.sqrt(x_vel**2 + y_vel**2)
-        return speed / speed.max()
-
-    def _reshape_vals(
-        self,
-        x_vels: torch.Tensor,
-        y_vels: torch.Tensor,
-        grid: torch.Tensor,
-        speeds: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Broadcast data to FlowField format
-
-        Args:
-            x_vels (Tensor): x velocities
-            y_vels (Tensor): y velocities
-            grid (Tensor): low dimensional grid coordinates
-            speeds (Tensor): magnitude of x_vels and y_vels
-        """
-        # Reshape to match FlowField object requirements
-        x_vels = torch.reshape(x_vels, (self.num_points, self.num_points))
-        y_vels = torch.reshape(y_vels, (self.num_points, self.num_points))
-        grid = torch.reshape(grid, (self.num_points, self.num_points, 2))
-        speeds = torch.reshape(speeds, (self.num_points, self.num_points))
-        return x_vels, y_vels, grid, speeds

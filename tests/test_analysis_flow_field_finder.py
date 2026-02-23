@@ -11,7 +11,7 @@ import torch
 pytest.importorskip("sklearn")
 from sklearn.decomposition import PCA
 
-from mrnntorch.analysis.flow_fields.flow_field_finder import FlowFieldFinder
+from mrnntorch.analysis.flow_field_finder import mFlowFieldFinder
 from mrnntorch.mRNN import mRNN
 
 
@@ -50,7 +50,7 @@ def _sample_trajectory(batch: int = 2, seq: int = 3, units: int = 3) -> torch.Te
 def test_flow_field_finder_init_sets_defaults():
     """Initializer should set hyperparameters and helper objects."""
     mrnn = _build_mrnn()
-    finder = FlowFieldFinder(
+    finder = mFlowFieldFinder(
         mrnn,
         num_points=5,
         x_offset=2,
@@ -64,23 +64,23 @@ def test_flow_field_finder_init_sets_defaults():
     assert finder.cancel_other_regions is True
     assert finder.follow_traj is True
     assert isinstance(finder.reduce_obj, PCA)
-    assert finder.linearization.mrnn is mrnn
+    assert finder.linearization.rnn is mrnn
 
 
 def test_reduce_traj_no_args_shape():
     """_reduce_traj should flatten [B,T,H] to [B*T,2]."""
     mrnn = _build_mrnn()
-    finder = FlowFieldFinder(mrnn)
+    finder = mFlowFieldFinder(mrnn)
     trajectory = _sample_trajectory()
     reduced = finder._reduce_traj(trajectory)
-    assert isinstance(reduced, np.ndarray)
+    assert isinstance(reduced, torch.Tensor)
     assert reduced.shape == (trajectory.shape[0] * trajectory.shape[1], 2)
 
 
 def test_inverse_grid_shapes_after_fit():
     """_inverse_grid should return consistent grid and inverse shapes."""
     mrnn = _build_mrnn()
-    finder = FlowFieldFinder(mrnn, num_points=4)
+    finder = mFlowFieldFinder(mrnn, num_points=4)
     trajectory = _sample_trajectory()
     finder._reduce_traj(trajectory)
 
@@ -98,7 +98,7 @@ def test_inverse_grid_shapes_after_fit():
 def test_compute_full_trajectory_all_regions_matches_grid():
     """When all regions are included, _compute_full_trajectory should echo grid."""
     mrnn = _build_mrnn()
-    finder = FlowFieldFinder(mrnn)
+    finder = mFlowFieldFinder(mrnn)
 
     grid_points = 5
     r1_vals = torch.randn(grid_points, 2)
@@ -107,7 +107,7 @@ def test_compute_full_trajectory_all_regions_matches_grid():
     full_act_batch = torch.randn(grid_points, 2, 3)
 
     region_list = list(mrnn.region_dict)
-    out = finder._compute_full_trajectory(region_list, grid, full_act_batch)
+    out = finder._compute_full_trajectory(grid, full_act_batch, *region_list)
     assert out.shape == grid.shape
     assert torch.allclose(out, grid)
 
@@ -115,7 +115,7 @@ def test_compute_full_trajectory_all_regions_matches_grid():
 def test_compute_velocity_and_speed_normalizes():
     """Velocity should be elementwise diffs and speed normalized to max 1."""
     mrnn = _build_mrnn()
-    finder = FlowFieldFinder(mrnn)
+    finder = mFlowFieldFinder(mrnn)
 
     h_prev = torch.zeros((2, 2, 2))
     h_next = torch.tensor([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
@@ -133,14 +133,14 @@ def test_compute_velocity_and_speed_normalizes():
 
 def test_find_linear_flow():
     mrnn = _build_mrnn_with_inputs()
-    finder = FlowFieldFinder(mrnn, num_points=3)
+    finder = mFlowFieldFinder(mrnn, num_points=3)
     trajectory = _sample_trajectory(batch=1, seq=2, units=3)
     finder.find_linear_flow(trajectory)
 
 
 def test_find_nonlinear_flow():
     mrnn = _build_mrnn_with_inputs()
-    finder = FlowFieldFinder(mrnn, num_points=3)
+    finder = mFlowFieldFinder(mrnn, num_points=3)
     trajectory = _sample_trajectory(batch=1, seq=2, units=3)
     inp = torch.zeros(1, 2, 1)
     finder.find_nonlinear_flow(trajectory, inp)

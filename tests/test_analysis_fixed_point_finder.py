@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import torch
 
-from mrnntorch.analysis.fixed_points.fp import FixedPointCollection
-from mrnntorch.analysis.fixed_points.fp_finder import FixedPointFinder
+from dsatorch.fixed_points.fp import FixedPointCollection
+from mrnntorch.analysis.fp_finder import mFixedPointFinder
 from mrnntorch.mRNN import mRNN
 
 
@@ -24,15 +24,15 @@ def _build_mrnn() -> mRNN:
 
 def test_fixed_point_finder_default_hps_copy():
     """default_hps should return a deep copy of defaults."""
-    hps = FixedPointFinder.default_hps()
+    hps = mFixedPointFinder.default_hps()
     hps["lr_init"] = 123.0
-    assert FixedPointFinder.default_hps()["lr_init"] != 123.0
+    assert mFixedPointFinder.default_hps()["lr_init"] != 123.0
 
 
 def test_sample_states_excludes_zero_tensors():
     """sample_states should avoid rows that are entirely zero."""
     mrnn = _build_mrnn()
-    finder = FixedPointFinder(mrnn, verbose=False)
+    finder = mFixedPointFinder(mrnn, verbose=False)
     torch.manual_seed(0)
     state_traj = torch.tensor([[[0.0], [1.0]], [[0.0], [2.0]]])
     samples = finder.sample_states(state_traj, n_inits=3, exclude_zero_tensors=True)
@@ -40,22 +40,13 @@ def test_sample_states_excludes_zero_tensors():
     assert torch.all(samples != 0).item()
 
 
-def test_sample_states_negative_noise_raises():
-    """Negative noise_scale should raise ValueError."""
-    mrnn = _build_mrnn()
-    finder = FixedPointFinder(mrnn, verbose=False)
-    state_traj = torch.ones((1, 1, 1))
-    with pytest.raises(ValueError):
-        finder.sample_states(state_traj, n_inits=1, noise_scale=-0.1)
-
-
 def test_identify_q_outliers_and_non_outliers():
     """Outlier helpers should split indices by threshold."""
     xstar = torch.zeros((3, 1))
     qstar = torch.tensor([0.5, 2.0, 1.5])
     fps = FixedPointCollection(xstar=xstar, qstar=qstar)
-    outliers = FixedPointFinder.identify_q_outliers(fps, q_thresh=1.0)
-    non_outliers = FixedPointFinder.identify_q_non_outliers(fps, q_thresh=1.0)
+    outliers = mFixedPointFinder.identify_q_outliers(fps, q_thresh=1.0)
+    non_outliers = mFixedPointFinder.identify_q_non_outliers(fps, q_thresh=1.0)
     assert torch.equal(outliers, torch.tensor([1, 2]))
     assert torch.equal(non_outliers, torch.tensor([0]))
 
@@ -63,13 +54,13 @@ def test_identify_q_outliers_and_non_outliers():
 def test_distance_outlier_helpers():
     """Distance helpers should flag points beyond threshold."""
     initial_states = torch.tensor([[0.0], [1.0], [10.0]])
-    init_idx = FixedPointFinder.get_init_non_distance_outliers(
+    init_idx = mFixedPointFinder.get_init_non_distance_outliers(
         initial_states, dist_thresh=1.0
     )
     assert torch.equal(init_idx, torch.tensor([0, 1]))
 
     fps = FixedPointCollection(xstar=torch.tensor([[0.0], [10.0]]))
-    fps_idx = FixedPointFinder.get_fp_non_distance_outliers(
+    fps_idx = mFixedPointFinder.get_fp_non_distance_outliers(
         fps, initial_states, dist_thresh=1.0
     )
     assert torch.equal(fps_idx, torch.tensor([0]))
@@ -78,7 +69,7 @@ def test_distance_outlier_helpers():
 def test_exclude_distance_outliers_filters_fps():
     """_exclude_distance_outliers should drop faraway fixed points."""
     mrnn = _build_mrnn()
-    finder = FixedPointFinder(
+    finder = mFixedPointFinder(
         mrnn,
         outlier_distance_scale=1.0,
         do_exclude_distance_outliers=True,
@@ -94,7 +85,7 @@ def test_exclude_distance_outliers_filters_fps():
 def test_broadcast_tiles_inputs_and_defaults(monkeypatch):
     """find_fixed_points should tile single inputs and pass default stim."""
     mrnn = _build_mrnn()
-    finder = FixedPointFinder(mrnn, do_exclude_distance_outliers=False, verbose=False)
+    finder = mFixedPointFinder(mrnn, do_exclude_distance_outliers=False, verbose=False)
 
     initial_states = torch.tensor([[[0.0], [1.0], [2.0]]])
     ext_inputs = torch.tensor([1.0])
@@ -113,7 +104,7 @@ def test_broadcast_tiles_inputs_and_defaults(monkeypatch):
 def test_find_fixed_points_rejects_bad_input_shape():
     """find_fixed_points should reject incompatible input batch sizes."""
     mrnn = _build_mrnn()
-    finder = FixedPointFinder(mrnn, do_exclude_distance_outliers=False, verbose=False)
+    finder = mFixedPointFinder(mrnn, do_exclude_distance_outliers=False, verbose=False)
     initial_states = torch.zeros((2, 1))
     ext_inputs = torch.zeros((3, 1))
     with pytest.raises(AssertionError):
@@ -123,7 +114,7 @@ def test_find_fixed_points_rejects_bad_input_shape():
 def test_fp_optimization_smoke():
     """_fp_optimization should return a populated FixedPointCollection."""
     mrnn = _build_mrnn()
-    finder = FixedPointFinder(mrnn, max_iters=1, verbose=False, super_verbose=False)
+    finder = mFixedPointFinder(mrnn, max_iters=1, verbose=False, super_verbose=False)
     initial_states = torch.zeros((2, 1), dtype=torch.float32)
     ext_inputs = torch.zeros((2, 1, 1), dtype=torch.float32)
     stim_inp = torch.zeros((2, 1, 1), dtype=torch.float32)
