@@ -55,8 +55,6 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         states: torch.Tensor,
         inp: torch.Tensor,
         *args,
-        stim_input: torch.Tensor | None = None,
-        W: torch.Tensor | None = None,
         **kwargs,
     ) -> list:
         """Compute 2D flow fields in a region subspace along a trajectory.
@@ -76,10 +74,9 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             list: FlowField object per sampled time.
         """
 
-        if "verbose" in kwargs:
-            verbose = kwargs["verbose"]
-        else:
-            verbose = False
+        verbose = kwargs["verbose"] if "verbose" in kwargs else False
+        stim_input = kwargs["stim_input"] if "stim_input" in kwargs else None
+        W = kwargs["W"] if "W" in kwargs else None
 
         flow_field_list = []
 

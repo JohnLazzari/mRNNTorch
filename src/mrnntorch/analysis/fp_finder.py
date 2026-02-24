@@ -271,12 +271,7 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
     # *************************************************************************
 
     def _run_additional_iterations_on_outliers(
-        self,
-        fps: FixedPointCollection,
-        n_rounds: int = 1,
-        stim_inp: torch.Tensor | None = None,
-        W_rec: torch.Tensor | None = None,
-        W_inp: torch.Tensor | None = None,
+        self, fps: FixedPointCollection, *args, **kwargs
     ) -> FixedPointCollection:
         """Detects outlier states with respect to the q function and runs
         additional optimization iterations on those states This should only be
@@ -305,6 +300,13 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
             large.
         """
 
+        n_rounds = kwargs["n_rounds"] if "n_rounds" in kwargs else 1
+        stim_inp = kwargs["stim_inp"] if "stim_inp" in kwargs else None
+        W_rec = kwargs["W_rec"] if "W_rec" in kwargs else None
+        W_inp = kwargs["W_inp"] if "W_inp" in kwargs else None
+
+        assert fps.qstar is not None
+
         outlier_min_q = float(np.median(fps.qstar) * self.outlier_q_scale)
 
         def perform_outlier_optimization(
@@ -323,9 +325,19 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
                 "over outlier states only."
             )
 
+            assert inputs is not None
+            assert n_prev_iters is not None
+
             updated_outlier_fps = self._fp_optimization(
-                initial_states, inputs, stim_inp=stim_inp, W_rec=W_rec, W_inp=W_inp
+                initial_states,
+                inputs,
+                *args,
+                stim_inp=stim_inp,
+                W_rec=W_rec,
+                W_inp=W_inp,
             )
+
+            assert updated_outlier_fps.n_iters is not None
 
             updated_outlier_fps.n_iters += n_prev_iters
             fps[idx_outliers.tolist()] = updated_outlier_fps
@@ -357,13 +369,7 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
         return fps
 
     def _fp_optimization(
-        self,
-        initial_states: torch.Tensor,
-        ext_inp: torch.Tensor,
-        *args,
-        stim_inp: torch.Tensor | None = None,
-        W_rec: torch.Tensor | None = None,
-        W_inp: torch.Tensor | None = None,
+        self, initial_states: torch.Tensor, ext_inp: torch.Tensor, *args, **kwargs
     ) -> FixedPointCollection:
         """Finds multiple fixed points via a joint optimization over multiple
         state vectors.
@@ -386,6 +392,10 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
             fps: A FixedPoints object containing the optimized fixed points
             and associated metadata.
         """
+
+        stim_inp = kwargs["stim_inp"] if "stim_inp" in kwargs else None
+        W_rec = kwargs["W_rec"] if "W_rec" in kwargs else None
+        W_inp = kwargs["W_inp"] if "W_inp" in kwargs else None
 
         # Get batch and time dims
         if self.batch_first:
@@ -558,7 +568,7 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
             dq=ev_dq_b,
             n_iters=n_iters,
             tol_unique=self.tol_unique,
-            dtype=self.np_dtype,
+            dtype=self.torch_dtype,
         )
 
         return fps
