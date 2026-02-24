@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from mrnntorch.analysis.linear import mLinearization
 from dsatorch.flow_fields.flow_field import FlowField
 from dsatorch.flow_fields.flow_field_finder import FlowFieldFinder
@@ -74,9 +73,11 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             list: FlowField object per sampled time.
         """
 
-        verbose = kwargs["verbose"] if "verbose" in kwargs else False
         stim_input = kwargs["stim_input"] if "stim_input" in kwargs else None
         W = kwargs["W"] if "W" in kwargs else None
+        traj_to_reduce = (
+            kwargs["traj_to_reduce"] if "traj_to_reduce" in kwargs else states
+        )
 
         flow_field_list = []
 
@@ -101,19 +102,16 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             stim_input = torch.flatten(stim_input, end_dim=-2)
 
         if not args:
-            region_list = [region for region in self.rnn.region_dict]
+            region_list = self.rnn.hid_regions
         else:
             region_list = [region for region in args]
 
-        reduced_traj = self._reduce_traj(states, *region_list)
+        # get region activity for fitting and reduction
+        tmp_act_to_reduce = self.rnn.get_region_activity(traj_to_reduce, *args)
+        tmp_act = self.rnn.get_region_activity(states, *args)
 
-        lower_bound_x = -self.x_offset
-        upper_bound_x = self.x_offset
-        lower_bound_y = -self.y_offset
-        upper_bound_y = self.y_offset
-
-        max_x_vels, max_y_vels, max_speeds = [], [], []
-        min_x_vels, min_y_vels, min_speeds = [], [], []
+        self._fit_traj(tmp_act_to_reduce)
+        reduced_traj = self._reduce_traj(tmp_act)
 
         # Now going through trajectory
         for n in range(1, n_states):
@@ -121,20 +119,16 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             This loop will compute a single flow field for state n 
             This FlowField object will then be added to a list 
             """
-
+            # If follow trajectory is true get grid centered around current t
+            # This will make a different grid for each state (n grids)
             if self.follow_traj:
-                lower_bound_x = torch.round(
-                    reduced_traj[n, 0] - self.x_offset, decimals=1
-                ).item()
-                upper_bound_x = torch.round(
-                    reduced_traj[n, 0] + self.x_offset, decimals=1
-                ).item()
-                lower_bound_y = torch.round(
-                    reduced_traj[n, 1] - self.y_offset, decimals=1
-                ).item()
-                upper_bound_y = torch.round(
-                    reduced_traj[n, 1] + self.y_offset, decimals=1
-                ).item()
+                lower_bound_x, upper_bound_x, lower_bound_y, upper_bound_y = (
+                    self._set_tv_bounds(reduced_traj, n)
+                )
+            else:
+                lower_bound_x, upper_bound_x, lower_bound_y, upper_bound_y = (
+                    self._set_bounds(center=0)
+                )
 
             low_dim_grid, inverse_grid = self._inverse_grid(
                 lower_bound_x,
@@ -185,38 +179,6 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             flow_field = FlowField(x_vel, y_vel, low_dim_grid, speed)
             flow_field_list.append(flow_field)
 
-            # append max values to lists
-            max_x_vels.append(flow_field.max_x_vel)
-            max_y_vels.append(flow_field.max_y_vel)
-            max_speeds.append(flow_field.max_speed)
-
-            # append min values to lists
-            min_x_vels.append(flow_field.min_x_vel)
-            min_y_vels.append(flow_field.min_y_vel)
-            min_speeds.append(flow_field.min_speed)
-
-        if verbose:
-            mean_max_x_vel, std_max_x_vel = np.mean(max_x_vels), np.std(max_x_vels)
-            mean_max_y_vel, std_max_y_vel = np.mean(max_y_vels), np.std(max_y_vels)
-            mean_max_speed, std_max_speed = np.mean(max_speeds), np.std(max_speeds)
-
-            mean_min_x_vel, std_min_x_vel = np.mean(min_x_vels), np.std(min_x_vels)
-            mean_min_y_vel, std_min_y_vel = np.mean(min_x_vels), np.std(min_y_vels)
-            mean_min_speed, std_min_speed = np.mean(min_x_vels), np.std(min_speeds)
-
-            print("======================")
-            print("Flow Field Statistics:")
-            print(
-                f"mean max x vel: {mean_max_x_vel} +/- {std_max_x_vel}   mean min x vel: {mean_min_x_vel} +/- {std_min_x_vel}"
-            )
-            print(
-                f"mean max y vel: {mean_max_y_vel} +/- {std_max_y_vel}   mean min y vel: {mean_min_y_vel} +/- {std_min_y_vel}"
-            )
-            print(
-                f"mean max speed: {mean_max_speed} +/- {std_max_speed}   mean min speed: {mean_min_speed} +/- {std_min_speed}"
-            )
-            print("======================")
-
         return flow_field_list
 
     def find_linear_flow(
@@ -243,37 +205,27 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
 
         # Gather region list from args, include all regions if args empty
         if not args:
-            region_list = [region for region in self.rnn.region_dict]
+            region_list = self.rnn.hid_regions
         else:
             region_list = [region for region in args]
 
         # Activity specific to regions in region list for later computations
         region_act = self.rnn.get_region_activity(states, *args)
         # Reduce the regional trajectories and return pca object
-        reduced_traj = self._reduce_traj(region_act, *region_list)
-
-        # Grid offsets
-        lower_bound_x = -self.x_offset
-        upper_bound_x = self.x_offset
-        lower_bound_y = -self.y_offset
-        upper_bound_y = self.y_offset
+        self._fit_traj(region_act)
+        reduced_traj = self._reduce_traj(region_act)
 
         for n in range(1, n_states):
             # If follow trajectory is true get grid centered around current t
             # This will make a different grid for each state (n grids)
             if self.follow_traj:
-                lower_bound_x = torch.round(
-                    reduced_traj[n, 0] - self.x_offset, decimals=1
-                ).item()
-                upper_bound_x = torch.round(
-                    reduced_traj[n, 0] + self.x_offset, decimals=1
-                ).item()
-                lower_bound_y = torch.round(
-                    reduced_traj[n, 1] - self.y_offset, decimals=1
-                ).item()
-                upper_bound_y = torch.round(
-                    reduced_traj[n, 1] + self.y_offset, decimals=1
-                ).item()
+                lower_bound_x, upper_bound_x, lower_bound_y, upper_bound_y = (
+                    self._set_tv_bounds(reduced_traj, n)
+                )
+            else:
+                lower_bound_x, upper_bound_x, lower_bound_y, upper_bound_y = (
+                    self._set_bounds(center=0)
+                )
 
             # Inverse the grid to pass through RNN
             low_dim_grid, inverse_grid = self._inverse_grid(
@@ -308,28 +260,6 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             flow_field_list.append(FlowField(x_vel, y_vel, low_dim_grid, speed))
 
         return flow_field_list
-
-    def _reduce_traj(self, trajectory: torch.Tensor, *args) -> torch.Tensor:
-        """
-        Fit PCA object and transform trajectory
-
-        Args:
-            trajectory (Tensor): states to reduce
-            args (str, ...): regions to gather
-
-        Returns:
-            Tensor: reduced states
-        """
-        # Gather activity for specified region and cell type
-        temp_act = self.rnn.get_region_activity(trajectory, *args)
-        temp_act = torch.reshape(temp_act, (-1, temp_act.shape[-1]))
-
-        # Do PCA on the specified region(s)
-        self.reduce_obj.fit(temp_act)
-        reduced_traj = self.reduce_obj.transform(temp_act)
-        reduced_traj = torch.from_numpy(reduced_traj)
-
-        return reduced_traj
 
     def _compute_full_trajectory(
         self, grid: torch.Tensor, full_act_batch: torch.Tensor, *args

@@ -831,6 +831,16 @@ class mRNN(nn.Module):
         hn = self.initial_condition.unsqueeze(0).repeat(batch_size, 1)
         return xn, hn
 
+    @property
+    def hid_regions(self):
+        """Returns names of all hidden regions in network as a list"""
+        return [r for r in self.region_dict]
+
+    @property
+    def inp_regions(self):
+        """Returns names of all input regions in network as a list"""
+        return [r for r in self.inp_dict]
+
     def forward(
         self,
         inp: torch.Tensor,
