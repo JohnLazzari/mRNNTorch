@@ -322,7 +322,7 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         """
         # Gather activity for specified region and cell type
         temp_act = self.rnn.get_region_activity(trajectory, *args)
-        temp_act = torch.reshape(trajectory, (-1, trajectory.shape[-1]))
+        temp_act = torch.reshape(temp_act, (-1, temp_act.shape[-1]))
 
         # Do PCA on the specified region(s)
         self.reduce_obj.fit(temp_act)
