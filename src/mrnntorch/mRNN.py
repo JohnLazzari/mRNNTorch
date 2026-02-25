@@ -848,9 +848,6 @@ class mRNN(nn.Module):
         h0: torch.Tensor,
         *args,
         noise: bool = False,
-        tv_noise: bool = False,
-        tv_noise_scale: float = 0.1,
-        start_noise: torch.Tensor | None = None,
         W_rec: torch.Tensor | None = None,
         W_inp: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -878,18 +875,6 @@ class mRNN(nn.Module):
             "Recurrent or input weights are not finalized, \
             call finalize_connectivity() in your custom model definition"
         )
-
-        # warnings and assertions for noise parameters
-        if tv_noise and not noise:
-            warnings.warn(
-                "tv_noise set to True and noise is False, no noise \
-                will be applied to the network"
-            )
-        if start_noise is not None and not noise:
-            warnings.warn(
-                "start_noise is not None and noise is False, no noise \
-                will be applied to the network"
-            )
 
         if inp.dim() != 3:
             raise Exception(
@@ -949,23 +934,10 @@ class mRNN(nn.Module):
             # Sample from normal distribution and scale by constant term
             if noise:
                 # Separate noise levels will be applied to each neuron/input
-                hid_noise = self._hid_noise(self.hid_noise_const, batch_shape)
-                inp_noise = self._inp_noise(self.inp_noise_const, batch_shape)
+                hid_noise = self._hid_noise(batch_shape)
+                inp_noise = self._inp_noise(batch_shape)
             else:
                 hid_noise = inp_noise = 0
-
-            # tv noise is only an option if noise is set to True
-            if tv_noise and noise:
-                hid_noise = hid_noise / (1 + (t * tv_noise_scale))
-                inp_noise = inp_noise / (1 + (t * tv_noise_scale))
-
-            # start_noise only an option if noise is True
-            if start_noise is not None and noise:
-                start_mask = (
-                    torch.where(start_noise > t, 0, 1).unsqueeze(1).to(self.device)
-                )
-                hid_noise = hid_noise * start_mask
-                inp_noise = inp_noise * start_mask
 
             """
             Update hidden state
@@ -1017,7 +989,7 @@ class mRNN(nn.Module):
         const_inp = (1 / self.alpha) * np.sqrt(2 * self.alpha * self.sigma_input**2)
         return const_inp
 
-    def _hid_noise(self, const: float, batch_shape: int):
+    def _hid_noise(self, batch_shape: int):
         """
         Gather a random noise sample at a given timepoint
 
@@ -1028,12 +1000,12 @@ class mRNN(nn.Module):
         Returns:
             Tensor: total_num_units sized tensor containing Gaussian noise
         """
-        perturb_hid = const * torch.randn(
+        perturb_hid = self.hid_noise_const * torch.randn(
             size=(batch_shape, self.total_num_units), device=self.device
         )
         return perturb_hid
 
-    def _inp_noise(self, const, batch_shape):
+    def _inp_noise(self, batch_shape):
         """
         Gather a random noise sample at a given timepoint
 
@@ -1044,7 +1016,7 @@ class mRNN(nn.Module):
         Returns:
             Tensor: total_num_inputs sized tensor containing Gaussian noise
         """
-        perturb_inp = const * torch.randn(
+        perturb_inp = self.inp_noise_const * torch.randn(
             size=(batch_shape, self.total_num_inputs), device=self.device
         )
         return perturb_inp

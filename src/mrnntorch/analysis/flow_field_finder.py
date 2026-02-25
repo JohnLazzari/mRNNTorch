@@ -92,8 +92,15 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         if inp.dim() == 1:
             inp = inp.unsqueeze(0)
 
+        if stim_input is not None:
+            if stim_input.dim() == 1:
+                stim_input = stim_input.unsqueeze(0)
+
         states = torch.flatten(states, end_dim=-2)
         inp = torch.flatten(inp, end_dim=-2)
+        stim_input = (
+            torch.flatten(stim_input, end_dim=-2) if stim_input is not None else None
+        )
 
         assert states.shape[0] == inp.shape[0]
         n_states = states.shape[0]
@@ -166,7 +173,7 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             cur_region_h = self.rnn.get_region_activity(h, *region_list)
             cur_region_h = torch.reshape(cur_region_h, (-1, cur_region_h.shape[-1]))
             cur_region_h = self.reduce_obj.transform(cur_region_h)
-            cur_region_h = torch.tensor(cur_region_h, dtype=self.dtype)
+            cur_region_h = torch.from_numpy(cur_region_h).to(self.dtype)
 
             x_vel, y_vel = self._compute_velocity(cur_region_h, low_dim_grid)
             speed = self._compute_speed(x_vel, y_vel)
