@@ -9,7 +9,7 @@ import json
 import pytest
 import torch
 
-from mrnntorch.mRNN import mRNN
+from mrnntorch.mrnn import mRNN
 
 
 def test_init_with_invalid_activation_raises():

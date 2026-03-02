@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from dsatorch.fixed_points.fp import FixedPointCollection
 from dsatorch.fixed_points.fp_finder import FixedPointFinder
-from mrnntorch.mRNN import mRNN
+from mrnntorch.mrnn import mRNN
 
 
 class mFixedPointFinder(FixedPointFinder[mRNN]):

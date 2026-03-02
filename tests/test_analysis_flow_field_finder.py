@@ -12,7 +12,7 @@ pytest.importorskip("sklearn")
 from sklearn.decomposition import PCA
 
 from mrnntorch.analysis.flow_field_finder import mFlowFieldFinder
-from mrnntorch.mRNN import mRNN
+from mrnntorch.mrnn import mRNN
 
 
 def _build_mrnn() -> mRNN:
@@ -72,6 +72,7 @@ def test_reduce_traj_no_args_shape():
     mrnn = _build_mrnn()
     finder = mFlowFieldFinder(mrnn)
     trajectory = _sample_trajectory()
+    finder._fit_traj(trajectory)
     reduced = finder._reduce_traj(trajectory)
     assert isinstance(reduced, torch.Tensor)
     assert reduced.shape == (trajectory.shape[0] * trajectory.shape[1], 2)
@@ -82,6 +83,7 @@ def test_inverse_grid_shapes_after_fit():
     mrnn = _build_mrnn()
     finder = mFlowFieldFinder(mrnn, num_points=4)
     trajectory = _sample_trajectory()
+    finder._fit_traj(trajectory)
     finder._reduce_traj(trajectory)
 
     low_dim_grid, inverse_grid = finder._inverse_grid(-1.0, 1.0, -2.0, 2.0)

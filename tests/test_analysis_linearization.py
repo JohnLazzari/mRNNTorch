@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from mrnntorch.analysis.linear import mLinearization
-from mrnntorch.mRNN import mRNN
+from mrnntorch.mrnn import mRNN
 
 
 def test_relu_grad_returns_diagonal_jacobian():

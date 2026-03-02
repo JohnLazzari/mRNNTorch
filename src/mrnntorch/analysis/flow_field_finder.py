@@ -2,7 +2,7 @@ import torch
 from mrnntorch.analysis.linear import mLinearization
 from dsatorch.flow_fields.flow_field import FlowField
 from dsatorch.flow_fields.flow_field_finder import FlowFieldFinder
-from mrnntorch.mRNN import mRNN
+from mrnntorch.mrnn import mRNN
 
 
 class mFlowFieldFinder(FlowFieldFinder[mRNN]):

@@ -6,7 +6,7 @@ import torch
 
 from dsatorch.fixed_points.fp import FixedPointCollection
 from mrnntorch.analysis.fp_finder import mFixedPointFinder
-from mrnntorch.mRNN import mRNN
+from mrnntorch.mrnn import mRNN
 
 
 def _build_mrnn() -> mRNN:

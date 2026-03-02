@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from mrnntorch.mRNN import mRNN
+from mrnntorch.mrnn import mRNN
 from dsatorch.linear import Linearization
 
 
