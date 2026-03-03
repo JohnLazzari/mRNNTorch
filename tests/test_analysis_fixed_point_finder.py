@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from dsatorch.fixed_points.fp import FixedPointCollection
+from rnntoolkit.fixed_points.fp import FixedPointCollection
 from mrnntorch.analysis.fp_finder import mFixedPointFinder
 from mrnntorch.mrnn import mRNN
 

@@ -1,17 +1,16 @@
 import torch
 import torch.nn.functional as F
 from mrnntorch.mrnn import mRNN
-from dsatorch.linear import Linearization
+from typing import Tuple
 
 
-class mLinearization(Linearization[mRNN]):
+class mLinearization:
     def __init__(
         self,
         rnn: mRNN,
-        W_inp: torch.Tensor | None = None,
-        W_rec: torch.Tensor | None = None,
+        *args,
+        **kwargs,
     ):
-        super().__init__(rnn)
         """
         Linearization object that stores methods for local analyses of mRNNs
 
@@ -20,8 +19,128 @@ class mLinearization(Linearization[mRNN]):
             W_inp: Custom input weights to be used when linearizing
             W_rec: Custom recurrent weights to be used when linearizing
         """
-        self.W_inp = W_inp
-        self.W_rec = W_rec
+        self.rnn = rnn
+        # Regions which are treated as grid elements
+        # TODO make sure this can ensure order, same in flow fields and fp
+        self.zero_states = torch.zeros(
+            size=(
+                1,
+                rnn.total_num_units,
+            )
+        )
+        self.region_list = (
+            self.rnn.hid_regions
+            if not args
+            else [region for region in rnn._ensure_order(*args)]
+        )
+        # Regions treated as static inputs for grid elements
+        self.static_region_list = (
+            []
+            if self.region_list == self.rnn.hid_regions
+            else self.rnn.get_excluded_hid_regions(*self.region_list)
+        )
+        # Zeros for activity of static h input shape
+        self.zero_states_static = torch.zeros(
+            size=(
+                1,
+                rnn.get_region_activity(
+                    self.zero_states, *self.static_region_list
+                ).shape[-1],
+            )
+        )
+
+        # Unload kwargs
+        self.W_inp = kwargs["W_inp"] if "W_inp" in kwargs else None
+        self.W_rec = kwargs["W_rec"] if "W_rec" in kwargs else None
+
+    def __call__(
+        self,
+        pre_activation: torch.Tensor,
+        inp: torch.Tensor,
+        delta_inp: torch.Tensor,
+        delta_h: torch.Tensor,
+        **kwargs,
+    ) -> torch.Tensor:
+        return self.forward(pre_activation, inp, delta_inp, delta_h, **kwargs)
+
+    def forward(
+        self,
+        pre_activation: torch.Tensor,
+        inp: torch.Tensor,
+        delta_inp: torch.Tensor,
+        delta_h: torch.Tensor,
+        **kwargs,
+    ) -> torch.Tensor:
+        """
+        First order taylor expansion of RNN at a given point and input
+
+        Args:
+            inp: 1D tensor of input for network at a given state
+            h: 1D tensor of network state to linearize about
+            delta_inp: perturbation of input
+            delta_h: perturbation of state
+        """
+
+        # unpack kwargs
+        delta_h_static = (
+            kwargs["delta_h_static"]
+            if "delta_h_static" in kwargs
+            else self.zero_states_static
+        )
+
+        # Assert correct shapes
+        assert inp.dim() == 1
+        assert pre_activation.dim() == 1
+
+        if delta_h.dim() > 1:
+            delta_h = delta_h.flatten(start_dim=0, end_dim=-2)
+
+        # Get jacobians for included regions
+        _jacobian, _jacobian_inp = self.jacobian(pre_activation)
+        # Get jacobians for included regions
+        _jacobian_exc, _ = self.jacobian(pre_activation, excluded_regions=True)
+
+        # reshape to pass into RNN
+        inp = inp.unsqueeze(0).unsqueeze(0)
+        pre_activation = pre_activation.unsqueeze(0)
+        activation = self.rnn.activation(pre_activation)
+
+        # Get h_next for affine function
+        _, h_next = self.rnn(inp, pre_activation, activation)
+
+        h_pert = (
+            h_next.squeeze(0)
+            + (_jacobian @ delta_h.T).T
+            + (_jacobian_exc @ delta_h_static.T).T
+            + (_jacobian_inp @ delta_inp.T).T
+        )
+
+        return h_pert
+
+    @staticmethod
+    def relu_grad(x: torch.Tensor):
+        """
+        relu function.
+        Args:
+            x (torch.Tensor): pre-activation x to be used for gradient calculation
+            (can be batched now)
+        Returns:
+            torch: Elementwise derivatives of x.
+        """
+        # check what this returns
+        return torch.autograd.functional.jacobian(F.relu, x)
+
+    @staticmethod
+    def tanh_grad(x: torch.Tensor):
+        """
+        tanh function.
+        Args:
+            x (torch.Tensor): pre-activation x to be used for gradient calculation
+            (can be batched now)
+        Returns:
+            torch: Elementwise derivatives of x.
+        """
+        return torch.autograd.functional.jacobian(F.tanh, x)
 
     @staticmethod
     def sigmoid_grad(x: torch.Tensor):
@@ -47,7 +166,7 @@ class mLinearization(Linearization[mRNN]):
         """
         return torch.autograd.functional.jacobian(F.softplus, x)
 
-    def jacobian(self, h: torch.Tensor, *args) -> torch.Tensor:
+    def jacobian(self, x: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
         """Linearize the dynamics around a state and return the Jacobian.
 
         Computes the Jacobian of the mRNN update with respect to the hidden state
@@ -65,16 +184,32 @@ class mLinearization(Linearization[mRNN]):
             torch.Tensor | tuple[torch.Tensor, torch.Tensor]: Jacobian w.r.t. hidden
             state, and optionally (Jacobian w.r.t. input) if ``W_inp`` is provided.
         """
-        assert h.dim() == 1
+
+        excluded_regions = (
+            kwargs["excluded_regions"] if "excluded_regions" in kwargs else False
+        )
+
+        assert isinstance(excluded_regions, bool)
+        assert x.dim() == 1
 
         if self.W_rec is None:
             # Get the subset of the weights required for jacobian
-            weight_subset = self.rnn.get_weight_subset(*args)
+            if excluded_regions:
+                weight_subset = self.rnn.get_weight_subset(*self.static_region_list)
+            else:
+                weight_subset = self.rnn.get_weight_subset(*self.region_list)
         else:
             weight_subset = self.W_rec
 
+        if self.rnn.inp_constrained:
+            W_inp = self.rnn.apply_dales_law(
+                self.rnn.W_inp, self.rnn.W_inp_mask, self.rnn.W_inp_sign_matrix
+            )
+        else:
+            W_inp = self.rnn.W_inp
+
         # linearize the dynamics about state
-        x_sub = self.rnn.get_region_activity(h, *args)
+        x_sub = self.rnn.get_region_activity(x, *self.region_list)
 
         """
             Taking jacobian of x with respect to F
@@ -98,8 +233,9 @@ class mLinearization(Linearization[mRNN]):
 
         # Get final jacobian using form above
         _jacobian = d_x_act_diag @ weight_subset
+        _jacobian_inp = d_x_act_diag @ W_inp
 
-        return _jacobian
+        return _jacobian, _jacobian_inp
 
     def eigendecomposition(
         self, x: torch.Tensor, *args
@@ -116,7 +252,7 @@ class mLinearization(Linearization[mRNN]):
             torch.Tensor: Imag parts of eigenvalues.
             torch.Tensor: Eigenvectors stacked column-wise.
         """
-        _jacobian = self.jacobian(x, *args)
+        _jacobian, _ = self.jacobian(x, *args)
         eigenvalues, eigenvectors = torch.linalg.eig(_jacobian)
 
         # Split real and imaginary parts

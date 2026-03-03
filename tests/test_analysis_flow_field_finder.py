@@ -97,23 +97,6 @@ def test_inverse_grid_shapes_after_fit():
     assert inverse_grid.shape == (4, 4, 3)
 
 
-def test_compute_full_trajectory_all_regions_matches_grid():
-    """When all regions are included, _compute_full_trajectory should echo grid."""
-    mrnn = _build_mrnn()
-    finder = mFlowFieldFinder(mrnn)
-
-    grid_points = 5
-    r1_vals = torch.randn(grid_points, 2)
-    r2_vals = torch.randn(grid_points, 1)
-    grid = torch.cat([r1_vals, r2_vals], dim=-1)
-    full_act_batch = torch.randn(grid_points, 2, 3)
-
-    region_list = list(mrnn.region_dict)
-    out = finder._compute_full_trajectory(grid, full_act_batch, *region_list)
-    assert out.shape == grid.shape
-    assert torch.allclose(out, grid)
-
-
 def test_compute_velocity_and_speed_normalizes():
     """Velocity should be elementwise diffs and speed normalized to max 1."""
     mrnn = _build_mrnn()
@@ -137,7 +120,9 @@ def test_find_linear_flow():
     mrnn = _build_mrnn_with_inputs()
     finder = mFlowFieldFinder(mrnn, num_points=3)
     trajectory = _sample_trajectory(batch=1, seq=2, units=3)
-    finder.find_linear_flow(trajectory)
+    inp = torch.ones(size=(1, 2, 1))
+    delta_inp = torch.zeros(size=(1, 2, 1))
+    finder.find_linear_flow(trajectory, inp, delta_inp)
 
 
 def test_find_nonlinear_flow():

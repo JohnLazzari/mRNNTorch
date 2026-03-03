@@ -3,8 +3,8 @@ import numpy as np
 import time
 from copy import deepcopy
 
-from dsatorch.fixed_points.fp import FixedPointCollection
-from dsatorch.fixed_points.fp_finder import FixedPointFinder
+from rnntoolkit.fixed_points.fp import FixedPointCollection
+from rnntoolkit.fixed_points.fp_finder import FixedPointFinder
 from mrnntorch.mrnn import mRNN
 
 

@@ -702,6 +702,65 @@ class mRNN(nn.Module):
 
         return global_weight_collection
 
+    def combine_states(
+        self,
+        states_a: torch.Tensor,
+        states_b: torch.Tensor,
+        region_list_a: list,
+        region_list_b: list,
+        keep_dims=True,
+    ) -> torch.Tensor:
+        """
+        Take two states and concatenate them in order according to their given region lists
+
+        Args:
+            states_a (Tensor): a tensor of states from regions in region_list_a (assumed to be in exact order)
+            states_b (Tensor): a tensor of states from regions in region_list_b (assumed to be in exact order)
+            region_list_a (list): list containing hidden regions of states_a in order
+            region_list_b (list): list containing hidden regions of states_b in order
+
+        Returns:
+            full_state (Tensor): concatenated tensor of states_a and states_b along unit dimension
+        """
+
+        assert states_a.dim() == states_b.dim()
+
+        shape = tuple(states_a.shape)[:-1]
+
+        # Ensure states are bxd
+        states_a = torch.flatten(states_a, end_dim=-2)
+        states_b = torch.flatten(states_b, end_dim=-2)
+
+        # Gather batches of grids with trial activity at each timestep
+        region_a_idx = 0
+        region_b_idx = 0
+        full_state = []
+        for region in self.region_dict:
+            if region in region_list_a:
+                full_state.append(
+                    states_a[
+                        :,
+                        region_a_idx : region_a_idx + self.get_region_size(region),
+                    ]
+                )
+                region_a_idx += self.get_region_size(region)
+            elif region in region_list_b:
+                full_state.append(
+                    states_b[
+                        :,
+                        region_b_idx : region_b_idx + self.get_region_size(region),
+                    ]
+                )
+                region_b_idx += self.get_region_size(region)
+            else:
+                raise Exception(f"region {region} not in either list")
+        full_state = torch.cat(full_state, dim=-1)
+
+        if keep_dims:
+            full_state = torch.reshape(full_state, (*shape, full_state.shape[-1]))
+
+        return full_state
+
     def get_projection(self, to: str, from_: str) -> torch.Tensor:
         """Gather a subset of the weights
 
@@ -840,6 +899,26 @@ class mRNN(nn.Module):
     def inp_regions(self):
         """Returns names of all input regions in network as a list"""
         return [r for r in self.inp_dict]
+
+    def get_excluded_hid_regions(self, *args) -> list:
+        """
+        Return all of the hidden regions in the network not given to this function
+        """
+        excluded_regions = []
+        for region in self.region_dict:
+            if region not in args:
+                excluded_regions.append(region)
+        return excluded_regions
+
+    def get_excluded_inp_regions(self, *args) -> list:
+        """
+        Return all of the input regions in the network not given to this function
+        """
+        excluded_regions = []
+        for region in self.inp_dict:
+            if region not in args:
+                excluded_regions.append(region)
+        return excluded_regions
 
     def forward(
         self,
