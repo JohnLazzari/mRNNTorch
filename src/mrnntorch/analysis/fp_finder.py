@@ -474,6 +474,9 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
         if W_inp is not None:
             W_inp = W_inp.detach().clone()
 
+        # TODO think about changing this to h = activation(x), this issue
+        # currently finding fixed points with the assumption that x=h, which may not
+        # always be true but probably works decently with relu only
         while True:
             x, h = (
                 torch.cat(region_tensor_list, dim=-1),

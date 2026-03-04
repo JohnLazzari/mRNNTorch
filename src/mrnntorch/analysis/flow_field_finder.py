@@ -1,8 +1,10 @@
 import torch
 from mrnntorch.analysis.linear import mLinearization
+from sklearn.decomposition import PCA
 from rnntoolkit.flow_fields.flow_field import FlowField
 from rnntoolkit.flow_fields.flow_field_finder import FlowFieldFinder
 from mrnntorch.mrnn import mRNN
+from tensordict.nn import inv_softplus
 
 
 class mFlowFieldFinder(FlowFieldFinder[mRNN]):
@@ -22,24 +24,9 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         self,
         rnn: mRNN,
         *args,
-        num_points: int = _default_hps["num_points"],
-        x_offset: int = _default_hps["x_offset"],
-        y_offset: int = _default_hps["y_offset"],
-        center: int = _default_hps["center"],
-        cancel_other_regions: bool = _default_hps["cancel_other_regions"],
-        follow_traj: bool = _default_hps["follow_traj"],
-        dtype=_default_hps["dtype"],
+        **kwargs,
     ):
-        super().__init__(
-            rnn,
-            num_points,
-            x_offset,
-            y_offset,
-            center,
-            cancel_other_regions,
-            follow_traj,
-            dtype,
-        )
+        super().__init__(rnn, **kwargs)
         """
         Flow field that gathers a flow field about a specified trajectory
 
@@ -51,37 +38,32 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             cancel_other_regions (bool): whether or not to zero out activity from other regions
             follow_traj (bool): whether or not to center the grid around each trajectory
         """
+
+        # Unload mrnn specific kwargs
+        self.cancel_other_regions = (
+            kwargs["cancel_other_regions"]
+            if "cancel_other_regions" in kwargs
+            else self._default_hps["cancel_other_regions"]
+        )
+
         self.zero_states = torch.zeros(
             size=(
                 1,
                 rnn.total_num_units,
             )
         )
+
         # Regions which are treated as grid elements
         self.region_list = (
-            self.rnn.hid_regions if not args else [region for region in args]
+            self.rnn.hid_regions
+            if not args
+            else [region for region in self.rnn._ensure_order(*args)]
         )
         # Regions treated as static inputs for grid elements
         self.static_region_list = (
             []
             if self.region_list == self.rnn.hid_regions
             else self.rnn.get_excluded_hid_regions(*self.region_list)
-        )
-        # Zeros for activity of inverse grid shape
-        self.zero_states_grid = torch.zeros(
-            size=(
-                1,
-                rnn.get_region_activity(self.zero_states, *self.region_list).shape[-1],
-            )
-        )
-        # Zeros for activity of static h input shape
-        self.zero_states_static = torch.zeros(
-            size=(
-                1,
-                rnn.get_region_activity(
-                    self.zero_states, *self.static_region_list
-                ).shape[-1],
-            )
         )
         self.linearization = mLinearization(rnn, *self.region_list)
 
@@ -136,39 +118,39 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         n_states = states.shape[0]
 
         """
-        WARNING: states is now pre-activation of network and not the activations
-        this is so I can apply the activation function (some of which dont have inverses)
-        to get correctly matching xs and hs 
-
-        Previously xs and hs were assumed to be the same when gathering flow fields, but 
-        this is inaccurate since the network should only be in that regime in the linear 
-        case or the positive relu case.
-
-        Here I apply the activation on states, need to make this clear in documentation
+        states is now meant to be network activation, or h.
+        To get valid xs, we will invert h in the compute function
         """
 
-        h_states = self.rnn.activation(states)
-        h_states_to_reduce = self.rnn.activation(traj_to_reduce)
-
         # get region activity for fitting and reduction
-        tmp_h_states_to_reduce = self.rnn.get_region_activity(
-            h_states_to_reduce, *self.region_list
+        tmp_states_to_reduce = self.rnn.get_region_activity(
+            traj_to_reduce, *self.region_list
         )
-        tmp_h_states = self.rnn.get_region_activity(h_states, *self.region_list)
+        tmp_states = self.rnn.get_region_activity(states, *self.region_list)
 
-        self._fit_traj(tmp_h_states_to_reduce)
-        reduced_traj = self._reduce_traj(tmp_h_states)
+        self._fit_traj(tmp_states_to_reduce)
+        reduced_traj = self._reduce_traj(tmp_states)
 
-        # TODO figure out cancel other regions behavior
-        # This will still be preactivation for now
-        static_states = self.rnn.get_region_activity(states, *self.static_region_list)
+        if not self.static_region_list:
+            # Default to dummy tensor with shape
+            static_states = None
+        else:
+            static_states = self.rnn.get_region_activity(
+                states, *self.static_region_list
+            )
+
+            if self.cancel_other_regions:
+                static_states = static_states * torch.zeros_like(static_states)
 
         # Now going through trajectory
         for n in range(n_states):
+            # default for static states
+            static_states_n = static_states[n] if static_states is not None else None
+            # call nonlinear flowfield computation
             flow_field = self._compute_nonlinear_flowfield(
                 reduced_traj[n],
                 inp[n],
-                static_states_n=static_states[n],
+                static_states_n=static_states_n,
                 stim_input_n=stim_input[n],
                 W=W,
             )
@@ -202,20 +184,16 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         """
 
         # Unload kwargs
-        delta_h = (
-            kwargs["delta_h"]
-            if "delta_h" in kwargs
-            else self.zero_states_static.clone()
+        delta_h_static = (
+            kwargs["delta_h_static"] if "delta_h_static" in kwargs else None
         )
+
         traj_to_reduce = (
             kwargs["traj_to_reduce"] if "traj_to_reduce" in kwargs else states
         )
 
         # reshape to nxd
         states, inp, delta_inp = self._nxd(states), self._nxd(inp), self._nxd(delta_inp)
-        # Ensure if delta h is not given it matches states shape
-        if "delta_h" not in kwargs:
-            delta_h = delta_h.repeat(states.shape[0], 1)
 
         assert inp.shape[0] == delta_inp.shape[0]
         assert states.shape[0] == inp.shape[0]
@@ -236,26 +214,28 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         Here I apply the activation on states, need to make this clear in documentation
         """
 
-        h_states = self.rnn.activation(states)
-        h_states_to_reduce = self.rnn.activation(traj_to_reduce)
-
         # Activity specific to regions in region list for later computations
-        region_h_to_reduce_tmp = self.rnn.get_region_activity(
-            h_states_to_reduce, *self.region_list
+        region_to_reduce_tmp = self.rnn.get_region_activity(
+            traj_to_reduce, *self.region_list
         )
-        region_h_tmp = self.rnn.get_region_activity(h_states, *self.region_list)
+        region_tmp = self.rnn.get_region_activity(states, *self.region_list)
 
         # Reduce the regional trajectories and return pca object
-        self._fit_traj(region_h_to_reduce_tmp)
-        reduced_traj = self._reduce_traj(region_h_tmp)
+        self._fit_traj(region_to_reduce_tmp)
+        reduced_traj = self._reduce_traj(region_tmp)
+
+        # zero out static perturbations if regions are cancelled
+        if self.cancel_other_regions and delta_h_static is not None:
+            delta_h_static = delta_h_static * torch.zeros_like(delta_h_static)
 
         for n in range(n_states):
+            delta_h_static_n = delta_h_static[n] if delta_h_static is not None else None
             flow_field = self._compute_linear_flowfield(
                 states[n],
                 reduced_traj[n],
                 inp[n],
                 delta_inp[n],
-                delta_h_static=delta_h[n],
+                delta_h_static=delta_h_static_n,
             )
             # Reshape data back to grid
             flow_field_list.append(flow_field)
@@ -292,7 +272,7 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         static_states_n = (
             kwargs["static_states_n"]
             if "static_states_n" in kwargs
-            else self.zero_states_static.clone()
+            else None  # use zero states as a dummy initialization
         )
         stim_input_n = (
             kwargs["stim_input_n"]
@@ -320,26 +300,32 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         )
 
         # Repeat along the batch dimension to match the grid
-        static_act_batch = static_states_n.repeat(low_dim_grid.shape[0], 1)
+        if static_states_n is not None:
+            static_act_batch = static_states_n.repeat(low_dim_grid.shape[0], 1)
+        else:
+            static_act_batch = None
+
         full_inp_batch = inp_n.repeat(low_dim_grid.shape[0], 1)
         full_stim_batch = stim_input_n.repeat(low_dim_grid.shape[0], 1)
 
         # Combine the grid and static states to treat excluded regions as input
-        x_0_flow = self.rnn.combine_states(
-            inverse_grid, static_act_batch, self.region_list, self.static_region_list
-        )
+        if static_act_batch is not None:
+            grid_flow = self.rnn.combine_states(
+                inverse_grid,
+                static_act_batch,
+                self.region_list,
+                self.static_region_list,
+            )
+        else:
+            grid_flow = inverse_grid
 
-        """
-        Again, applying activation on x_0_flow, which is meant to represent h_states
-        """
-
-        h_0_flow = self.rnn.activation(x_0_flow)
+        # here is where we will invert the grid to get valid xs
+        x_0_flow = self._invert_h(grid_flow)
+        h_0_flow = grid_flow
 
         with torch.no_grad():
-            # Current timestep input
             # Get activity for current timestep
-
-            _, h = self.rnn(
+            _, h_next = self.rnn(
                 full_inp_batch.unsqueeze(self.time_dim),
                 x_0_flow,
                 h_0_flow,
@@ -348,11 +334,10 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
                 W_rec=W,
             )
 
-        # Get activity for regions of interest
-        h_next = self.rnn.get_region_activity(h, *self.region_list)
-        h_next = self._reduce_traj(h_next)
+        next_state = self.rnn.get_region_activity(h_next, *self.region_list)
+        next_state_reduced = self._reduce_traj(next_state)
 
-        x_vel, y_vel = self._compute_velocity(h_next, low_dim_grid)
+        x_vel, y_vel = self._compute_velocity(next_state_reduced, low_dim_grid)
         speed = self._compute_speed(x_vel, y_vel)
 
         # Reshape to match FlowField object requirements
@@ -393,7 +378,7 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         delta_h_static = (
             kwargs["delta_h_static"]
             if "delta_h_static" in kwargs
-            else self.zero_states_static.clone()
+            else None  # dummy for initialization
         )
 
         # If follow trajectory is true get grid centered around current t
@@ -419,19 +404,16 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         region_states_n = self.rnn.get_region_activity(states_n, *self.region_list)
         delta_h = inverse_grid - region_states_n
 
-        """
-        I won't apply activations on states here, linearization will take care of that
-        Remember, states_n is currently the preactivation given by the user, not activation yet
-        """
+        pre_states_n = self._invert_h(states_n)
 
         with torch.no_grad():
-            h = self.linearization(
-                states_n, inp_n, delta_inp_n, delta_h, delta_h_static=delta_h_static
+            h_next = self.linearization(
+                pre_states_n, inp_n, delta_inp_n, delta_h, delta_h_static=delta_h_static
             )
 
         # Put next h into a grid format
-        h_next = self.rnn.get_region_activity(h, *self.region_list)
-        h_next = self._reduce_traj(h)
+        h_next = self.rnn.get_region_activity(h_next, *self.region_list)
+        h_next = self._reduce_traj(h_next)
 
         # Compute velocities between gathered trajectory of grid and original grid values
         x_vel, y_vel = self._compute_velocity(h_next, low_dim_grid)
@@ -442,3 +424,26 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         )
 
         return FlowField(x_vel, y_vel, low_dim_grid, speed)
+
+    def _invert_h(self, h: torch.Tensor) -> torch.Tensor:
+        """
+        Utilities to invert the activation function to get preactivations
+
+        Args:
+            h (Tensor): network activation
+        """
+        if self.rnn.activation_name == "tanh":
+            x = torch.atanh(h)
+        elif self.rnn.activation_name == "sigmoid":
+            x = torch.logit(h)
+        elif self.rnn.activation_name == "softplus":
+            x = inv_softplus(h)
+        elif self.rnn.activation_name == "relu" or self.rnn.activation_name == "linear":
+            # This is somewhat of a pseudo inverse of relu
+            # It provides a valid potential value for x, although it may not exactly
+            # be like this in a network state with a particular x and h
+            x = h
+        else:
+            raise Exception("invalid activation function")
+        assert isinstance(x, torch.Tensor)
+        return x

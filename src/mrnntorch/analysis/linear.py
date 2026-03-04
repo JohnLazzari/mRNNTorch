@@ -21,7 +21,6 @@ class mLinearization:
         """
         self.rnn = rnn
         # Regions which are treated as grid elements
-        # TODO make sure this can ensure order, same in flow fields and fp
         self.zero_states = torch.zeros(
             size=(
                 1,
@@ -38,15 +37,6 @@ class mLinearization:
             []
             if self.region_list == self.rnn.hid_regions
             else self.rnn.get_excluded_hid_regions(*self.region_list)
-        )
-        # Zeros for activity of static h input shape
-        self.zero_states_static = torch.zeros(
-            size=(
-                1,
-                rnn.get_region_activity(
-                    self.zero_states, *self.static_region_list
-                ).shape[-1],
-            )
         )
 
         # Unload kwargs
@@ -83,9 +73,7 @@ class mLinearization:
 
         # unpack kwargs
         delta_h_static = (
-            kwargs["delta_h_static"]
-            if "delta_h_static" in kwargs
-            else self.zero_states_static
+            kwargs["delta_h_static"] if "delta_h_static" in kwargs else None
         )
 
         # Assert correct shapes
@@ -97,8 +85,11 @@ class mLinearization:
 
         # Get jacobians for included regions
         _jacobian, _jacobian_inp = self.jacobian(pre_activation)
-        # Get jacobians for included regions
-        _jacobian_exc, _ = self.jacobian(pre_activation, excluded_regions=True)
+        if len(self.static_region_list) >= 1:
+            # Get jacobians for excluded regions if available
+            _jacobian_exc, _ = self.jacobian(pre_activation, excluded_regions=True)
+        else:
+            _jacobian_exc = None
 
         # reshape to pass into RNN
         inp = inp.unsqueeze(0).unsqueeze(0)
@@ -108,12 +99,19 @@ class mLinearization:
         # Get h_next for affine function
         _, h_next = self.rnn(inp, pre_activation, activation)
 
-        h_pert = (
-            h_next.squeeze(0)
-            + (_jacobian @ delta_h.T).T
-            + (_jacobian_exc @ delta_h_static.T).T
-            + (_jacobian_inp @ delta_inp.T).T
-        )
+        if _jacobian_exc is None or delta_h_static is None:
+            h_pert = (
+                h_next.squeeze(0)
+                + (_jacobian @ delta_h.T).T
+                + (_jacobian_inp @ delta_inp.T).T
+            )
+        else:
+            h_pert = (
+                h_next.squeeze(0)
+                + (_jacobian @ delta_h.T).T
+                + (_jacobian_exc @ delta_h_static.T).T
+                + (_jacobian_inp @ delta_inp.T).T
+            )
 
         return h_pert
 
@@ -184,6 +182,7 @@ class mLinearization:
             torch.Tensor | tuple[torch.Tensor, torch.Tensor]: Jacobian w.r.t. hidden
             state, and optionally (Jacobian w.r.t. input) if ``W_inp`` is provided.
         """
+        # TODO there will be any errors in here for excluded region behavior, the shape of the matrix will be off for the affine transformation, needs to be included_region_n x excluded_region_n
 
         excluded_regions = (
             kwargs["excluded_regions"] if "excluded_regions" in kwargs else False
@@ -195,6 +194,10 @@ class mLinearization:
         if self.W_rec is None:
             # Get the subset of the weights required for jacobian
             if excluded_regions:
+                if not self.static_region_list:
+                    raise Exception(
+                        "static region list empty, cannot gather excluded region jacobian"
+                    )
                 weight_subset = self.rnn.get_weight_subset(*self.static_region_list)
             else:
                 weight_subset = self.rnn.get_weight_subset(*self.region_list)
@@ -209,7 +212,10 @@ class mLinearization:
             W_inp = self.rnn.W_inp
 
         # linearize the dynamics about state
-        x_sub = self.rnn.get_region_activity(x, *self.region_list)
+        if excluded_regions:
+            x_sub = self.rnn.get_region_activity(x, *self.static_region_list)
+        else:
+            x_sub = self.rnn.get_region_activity(x, *self.region_list)
 
         """
             Taking jacobian of x with respect to F
