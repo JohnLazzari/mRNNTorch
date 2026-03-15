@@ -3,8 +3,7 @@ from mrnntorch.analysis.linear import mLinearization
 from sklearn.decomposition import PCA
 from rnntoolkit.flow_fields.flow_field import FlowField
 from rnntoolkit.flow_fields.flow_field_finder import FlowFieldFinder
-from mrnntorch.mrnn import mRNN
-from tensordict.nn import inv_softplus
+from mrnntorch.mrnn.leaky_mrnn import mRNN
 
 
 class mFlowFieldFinder(FlowFieldFinder[mRNN]):
@@ -320,21 +319,21 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
             grid_flow = inverse_grid
 
         # here is where we will invert the grid to get valid xs
-        x_0_flow = self._invert_h(grid_flow)
-        h_0_flow = grid_flow
+        x_0_flow = grid_flow
+        h_0_flow = self.rnn.activation(x_0_flow)
 
         with torch.no_grad():
             # Get activity for current timestep
-            _, h_next = self.rnn(
+            x_next, _ = self.rnn(
                 full_inp_batch.unsqueeze(self.time_dim),
                 x_0_flow,
                 h_0_flow,
-                full_stim_batch.unsqueeze(self.time_dim),
+                stim_input=full_stim_batch.unsqueeze(self.time_dim),
                 noise=False,
                 W_rec=W,
             )
 
-        next_state = self.rnn.get_region_activity(h_next, *self.region_list)
+        next_state = self.rnn.get_region_activity(x_next, *self.region_list)
         next_state_reduced = self._reduce_traj(next_state)
 
         x_vel, y_vel = self._compute_velocity(next_state_reduced, low_dim_grid)
@@ -404,11 +403,16 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         region_states_n = self.rnn.get_region_activity(states_n, *self.region_list)
         delta_h = inverse_grid - region_states_n
 
-        pre_states_n = self._invert_h(states_n)
+        h_states_n = self.rnn.activation(states_n)
 
         with torch.no_grad():
             h_next = self.linearization(
-                pre_states_n, inp_n, delta_inp_n, delta_h, delta_h_static=delta_h_static
+                inp_n,
+                states_n,
+                h_states_n,
+                delta_inp_n,
+                delta_h,
+                delta_h_static=delta_h_static,
             )
 
         # Put next h into a grid format
@@ -424,26 +428,3 @@ class mFlowFieldFinder(FlowFieldFinder[mRNN]):
         )
 
         return FlowField(x_vel, y_vel, low_dim_grid, speed)
-
-    def _invert_h(self, h: torch.Tensor) -> torch.Tensor:
-        """
-        Utilities to invert the activation function to get preactivations
-
-        Args:
-            h (Tensor): network activation
-        """
-        if self.rnn.activation_name == "tanh":
-            x = torch.atanh(h)
-        elif self.rnn.activation_name == "sigmoid":
-            x = torch.logit(h)
-        elif self.rnn.activation_name == "softplus":
-            x = inv_softplus(h)
-        elif self.rnn.activation_name == "relu" or self.rnn.activation_name == "linear":
-            # This is somewhat of a pseudo inverse of relu
-            # It provides a valid potential value for x, although it may not exactly
-            # be like this in a network state with a particular x and h
-            x = h
-        else:
-            raise Exception("invalid activation function")
-        assert isinstance(x, torch.Tensor)
-        return x
