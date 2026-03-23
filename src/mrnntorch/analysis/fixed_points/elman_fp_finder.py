@@ -4,11 +4,11 @@ import time
 from copy import deepcopy
 
 from rnntoolkit.fixed_points.fp import FixedPointCollection
-from rnntoolkit.fixed_points.fp_finder import FixedPointFinder
-from mrnntorch.mrnn import mRNN
+from rnntoolkit.fixed_points.fp_finder import FixedPointFinderBase
+from mrnntorch.mrnn.elman_mrnn import ElmanmRNN
 
 
-class mFixedPointFinder(FixedPointFinder[mRNN]):
+class emFixedPointFinder(FixedPointFinderBase[ElmanmRNN]):
     _default_hps = {
         "lr_init": 1e-4,
         "lr_patience": 5,
@@ -51,7 +51,7 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
 
     def __init__(
         self,
-        rnn: mRNN,
+        rnn: ElmanmRNN,
         lr_init: float = _default_hps["lr_init"],
         lr_patience: float = _default_hps["lr_patience"],
         lr_factor: float = _default_hps["lr_factor"],
@@ -75,26 +75,10 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
     ):
         super().__init__(
             rnn,
-            lr_init,
-            lr_patience,
-            lr_factor,
-            lr_cooldown,
-            tol_q,
-            tol_dq,
-            max_iters,
-            do_rerun_q_outliers,
-            outlier_q_scale,
-            do_exclude_distance_outliers,
-            outlier_distance_scale,
-            tol_unique,
-            max_n_unique,
-            dtype,
-            random_seed,
-            verbose,
-            super_verbose,
-            n_iters_per_print_update,
         )
+
         """Creates a FixedPointFinder object.
+        Inherited from FixedPointFinderBase
 
         Optimization terminates once every initialization satisfies one or
         both of the following criteria:
@@ -103,72 +87,70 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
 
         Args:
             rnn_cell: A Pytorch RNN
-
             tol_q (optional): A positive scalar specifying the optimization
-            termination criteria on each q-value. Default: 1e-12.
-
+                termination criteria on each q-value. Default: 1e-12.
             tol_dq (optional): A positive scalar specifying the optimization
-            termination criteria on the improvement of each q-value (i.e.,
-            "dq") from one optimization iteration to the next. Default: 1e-20.
-
+                termination criteria on the improvement of each q-value (i.e.,
+                "dq") from one optimization iteration to the next.
             max_iters (optional): A non-negative integer specifying the
-            maximum number of gradient descent iterations allowed.
-            Optimization terminates upon reaching this iteration count, even
-            if 'tol' has not been reached. Default: 5000.
-
+                maximum number of gradient descent iterations allowed.
             do_rerun_q_outliers (optional): A bool indicating whether or not
-            to run additional optimization iterations on putative outlier
-            states, identified as states with large q values relative to the
-            median q value across all identified fixed points (i.e., after
-            the initial optimization ran to termination). These additional
-            optimizations are run sequentially (even if method is 'joint').
-            Default: False.
-
+                to run additional optimization iterations on putative outlier
+                states
             outlier_q_scale (optional): A positive float specifying the q
-            value for putative outlier fixed points, relative to the median q
-            value across all identified fixed points. Default: 10.
-
+                value for putative outlier fixed points, relative to the median q
+                value across all identified fixed points. Default: 10.
             do_exclude_distance_outliers (optional): A bool indicating
-            whether or not to discard states that are far away from the set
-            of initial states, as measured by a normalized euclidean
-            distance. If true, states are evaluated and possibly discarded
-            after the initial optimization runs to termination.
-            Default: True.
-
+                whether or not to discard states that are far away from the set
+                of initial states
             outlier_distance_scale (optional): A positive float specifying a
-            normalized distance cutoff used to exclude distance outliers. All
-            distances are calculated relative to the centroid of the
-            initial_states and are normalized by the average distance-to-
-            centroid of the initial_states. Default: 10.
-
+                normalized distance cutoff used to exclude distance outliers
             tol_unique (optional): A positive scalar specifying the numerical
-            precision required to label two fixed points as being unique from
-            one another. Two fixed points will be considered unique if they
-            differ by this amount (or more) along any dimension. This
-            tolerance is used to discard numerically similar fixed points.
-            Default: 1e-3.
-
+                precision required to label two fixed points as being unique from
+                one another. 
             max_n_unique (optional): A positive integer indicating the max
-            number of unique fixed points to keep. If the number of unique
-            fixed points identified exceeds this value, points are randomly
-            dropped. Default: np.inf.
-
+                number of unique fixed points to keep.
             dtype: string indicating the data type to use for all numerical ops
-            and objects. Default: 'float32'
-
+                and objects. Default: 'float32'
             random_seed: Seed for numpy random number generator. Default: 0.
-
             verbose (optional): A bool indicating whether to print high-level
-            status updates. Default: True.
-
+                status updates. Default: True.
             super_verbose (optional): A bool indicating whether or not to
-            print per-iteration updates during each optimization. Default:
-            False.
-
+                print per-iteration updates during each optimization. Default:
+                False.
             n_iters_per_print_update (optional): An int specifying how often
-            to print updates during the fixed point optimizations. Default:
-            100.
+                to print updates during the fixed point optimizations. Default:
+                100.
         """
+
+        self.dtype = dtype
+        self.device = next(rnn.parameters()).device
+        self.torch_dtype = getattr(torch, self.dtype)
+
+        # Make random sequences reproducible
+        self.random_seed = random_seed
+        self.rng = np.random.RandomState(random_seed)
+
+        # *********************************************************************
+        # Optimization hyperparameters ****************************************
+        # *********************************************************************
+
+        self.lr_init = lr_init
+        self.lr_patience = lr_patience
+        self.lr_factor = lr_factor
+        self.lr_cooldown = lr_cooldown
+        self.tol_q = tol_q
+        self.tol_dq = tol_dq
+        self.max_iters = max_iters
+        self.do_rerun_q_outliers = do_rerun_q_outliers
+        self.outlier_q_scale = outlier_q_scale
+        self.do_exclude_distance_outliers = do_exclude_distance_outliers
+        self.outlier_distance_scale = outlier_distance_scale
+        self.tol_unique = tol_unique
+        self.max_n_unique = max_n_unique
+        self.verbose = verbose
+        self.super_verbose = super_verbose
+        self.n_iters_per_print_update = n_iters_per_print_update
 
     # *************************************************************************
     # Primary exposed functions ***********************************************
@@ -179,7 +161,9 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
         initial_states: torch.Tensor,
         ext_inputs: torch.Tensor,
         *args,
-        **kwargs,
+        stim_inp: torch.Tensor | None = None,
+        W_rec: torch.Tensor | None = None,
+        n_rounds_q_opt: int = 1,
     ) -> tuple[FixedPointCollection, FixedPointCollection]:
         """Finds RNN fixed points and the Jacobians at the fixed points.
 
@@ -216,18 +200,12 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
             unique_fps).
         """
 
-        stim_inp = kwargs["stim_inp"] if "stim_inp" in kwargs else None
-        W_rec = kwargs["W_rec"] if "W_rec" in kwargs else None
-        W_inp = kwargs["W_inp"] if "W_inp" in kwargs else None
-        n_rounds_q_opt = kwargs["n_rounds_q_opt"] if "n_rounds_q_opt" in kwargs else 1
-
         all_fps = self._fp_optimization(
             initial_states,
             ext_inputs,
             *args,
             stim_inp=stim_inp,
             W_rec=W_rec,
-            W_inp=W_inp,
         )
 
         # Filter out duplicates after from the first optimization round
@@ -245,7 +223,6 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
                 unique_fps,
                 stim_inp=stim_inp,
                 W_rec=W_rec,
-                W_inp=W_inp,
                 n_rounds=n_rounds_q_opt,
             )
             # Filter out duplicates after from the second optimization round
@@ -271,7 +248,12 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
     # *************************************************************************
 
     def _run_additional_iterations_on_outliers(
-        self, fps: FixedPointCollection, *args, **kwargs
+        self,
+        fps: FixedPointCollection,
+        *args,
+        n_rounds: int = 1,
+        stim_inp: torch.Tensor | None = None,
+        W_rec: torch.Tensor | None = None,
     ) -> FixedPointCollection:
         """Detects outlier states with respect to the q function and runs
         additional optimization iterations on those states This should only be
@@ -299,11 +281,6 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
             with learning rate schedules restarting from values that are too
             large.
         """
-
-        n_rounds = kwargs["n_rounds"] if "n_rounds" in kwargs else 1
-        stim_inp = kwargs["stim_inp"] if "stim_inp" in kwargs else None
-        W_rec = kwargs["W_rec"] if "W_rec" in kwargs else None
-        W_inp = kwargs["W_inp"] if "W_inp" in kwargs else None
 
         assert fps.qstar is not None
 
@@ -334,7 +311,6 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
                 *args,
                 stim_inp=stim_inp,
                 W_rec=W_rec,
-                W_inp=W_inp,
             )
 
             assert updated_outlier_fps.n_iters is not None
@@ -369,7 +345,12 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
         return fps
 
     def _fp_optimization(
-        self, initial_states: torch.Tensor, ext_inp: torch.Tensor, *args, **kwargs
+        self,
+        initial_states: torch.Tensor,
+        ext_inp: torch.Tensor,
+        *args,
+        stim_inp: torch.Tensor | None = None,
+        W_rec: torch.Tensor | None = None,
     ) -> FixedPointCollection:
         """Finds multiple fixed points via a joint optimization over multiple
         state vectors.
@@ -392,10 +373,6 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
             fps: A FixedPoints object containing the optimized fixed points
             and associated metadata.
         """
-
-        stim_inp = kwargs["stim_inp"] if "stim_inp" in kwargs else None
-        W_rec = kwargs["W_rec"] if "W_rec" in kwargs else None
-        W_inp = kwargs["W_inp"] if "W_inp" in kwargs else None
 
         # Get batch and time dims
         if self.batch_first:
@@ -471,26 +448,16 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
 
         if W_rec is not None:
             W_rec = W_rec.detach().clone()
-        if W_inp is not None:
-            W_inp = W_inp.detach().clone()
 
-        # TODO think about changing this to h = activation(x), this issue
-        # currently finding fixed points with the assumption that x=h, which may not
-        # always be true but probably works decently with relu only
         while True:
-            x, h = (
-                torch.cat(region_tensor_list, dim=-1),
-                torch.cat(region_tensor_list, dim=-1),
-            )
+            h = torch.cat(region_tensor_list, dim=-1)
 
-            _, F_x_1xbxd = self.rnn(
+            F_x_1xbxd = self.rnn(
                 ext_inp,
-                x,
                 h,
                 stim_inp,
                 noise=False,
                 W_rec=W_rec,
-                W_inp=W_inp,
             )
             F_x_1xbxd = F_x_1xbxd.squeeze(TIME_DIM)
 
@@ -575,3 +542,60 @@ class mFixedPointFinder(FixedPointFinder[mRNN]):
         )
 
         return fps
+
+    def _exclude_distance_outliers(
+        self, fps: FixedPointCollection, initial_states: torch.Tensor
+    ) -> FixedPointCollection:
+        """Removes putative distance outliers from a set of fixed points.
+        See docstring for identify_distance_non_outliers(...).
+        """
+
+        idx_keep = self.get_fp_non_distance_outliers(
+            fps, initial_states, self.outlier_distance_scale
+        )
+        return fps[idx_keep.tolist()]
+
+    def _print_if_verbose(self, *args, **kwargs):
+        if self.verbose:
+            print(*args, **kwargs)
+
+    @classmethod
+    def _print_iter_update(
+        cls,
+        iter_count: int,
+        t_start: float,
+        q: torch.Tensor,
+        dq: torch.Tensor,
+        lr: float,
+        is_final: bool = False,
+    ):
+        t = time.time()
+        t_elapsed = t - t_start
+        avg_iter_time = t_elapsed / iter_count
+
+        if is_final:
+            delimiter = "\n\t\t"
+            print("\t\t%d iters%s" % (iter_count, delimiter), end="")
+        else:
+            delimiter = ", "
+            print("\tIter: %d%s" % (iter_count, delimiter), end="")
+
+        if q.size == 1:
+            print("q = %.2e%sdq = %.2e%s" % (q, delimiter, dq, delimiter), end="")
+        else:
+            mean_q = torch.mean(q)
+            std_q = torch.std(q)
+
+            mean_dq = torch.mean(dq)
+            std_dq = torch.std(dq)
+
+            print(
+                "q = %.2e +/- %.2e%s"
+                "dq = %.2e +/- %.2e%s"
+                % (mean_q, std_q, delimiter, mean_dq, std_dq, delimiter),
+                end="",
+            )
+
+        print("learning rate = %.2e%s" % (lr, delimiter), end="")
+
+        print("avg iter time = %.2e sec" % avg_iter_time, end="")

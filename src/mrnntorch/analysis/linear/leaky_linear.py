@@ -17,8 +17,6 @@ class mLinearization:
             W_inp: Custom input weights to be used when linearizing
             W_rec: Custom recurrent weights to be used when linearizing
         """
-        # TODO make this linearization work for elman mrnn
-        # TODO allow an option to compute jacobian for h_t+1 or x_t+1, currently only does h_t+1
         self.rnn = rnn
         # Regions which are treated as grid elements
         self.zero_states = torch.zeros(
@@ -147,6 +145,9 @@ class mLinearization:
 
         assert isinstance(excluded_regions, bool)
         assert x.dim() == 1
+        assert input.dim() == 1
+        if h is not None:
+            assert h.dim() == 1
 
         """
             Taking jacobian of x with respect to F
@@ -154,19 +155,28 @@ class mLinearization:
                 J_(ij)(x) = -I_(ij) + W_(ij)h'(x_j)
         """
 
-        # For leaky mrnn, there are three inputs and two outputs
-        x_jacobians, h_jacobians = torch.autograd.functional.jacobian(
-            self.rnn, (input, x, h)
-        )
+        input = input.unsqueeze(0).unsqueeze(0)
+        x = x.unsqueeze(0)
 
-        # unpack the tuples for x and h
-        x_jacobian_input, x_jacobian_x, _ = x_jacobians
-        h_jacobian_input, _, h_jacobian_h = h_jacobians
-
+        # Only pay attention to h if dh is true
+        # if dh is False, h will be ignored
         if dh:
+            assert h is not None
+            h = h.unsqueeze(0)
+
+        # For leaky mrnn, there are three inputs and two outputs
+        if dh:
+            _, h_jacobians = torch.autograd.functional.jacobian(self.rnn, (input, x, h))
+            # unpack the tuples for x and h
+            h_jacobian_input, _, h_jacobian_h = h_jacobians
+
             _jacobian = h_jacobian_h
             _jacobian_input = h_jacobian_input
         else:
+            x_jacobians, _ = torch.autograd.functional.jacobian(self.rnn, (input, x))
+            # unpack the tuples for x and h
+            x_jacobian_input, x_jacobian_x = x_jacobians
+
             _jacobian = x_jacobian_x
             _jacobian_input = x_jacobian_input
 
@@ -185,7 +195,7 @@ class mLinearization:
         else:
             _jacobian = self.rnn.get_weight_subset(*self.region_list)
 
-        return _jacobian, _jacobian_input
+        return _jacobian.squeeze(), _jacobian_input.squeeze()
 
     def eigendecomposition(
         self,

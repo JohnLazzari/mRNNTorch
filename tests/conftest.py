@@ -16,7 +16,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 try:
-    from mrnntorch.Region import region_base
+    from mrnntorch.region import region_base
 except Exception:
     region_base = None
 

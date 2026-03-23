@@ -6,7 +6,7 @@ basic mRNN wiring assumptions without invoking heavy training loops.
 
 import torch
 
-from mrnntorch.mrnn import mRNN
+from mrnntorch.mrnn.leaky_mrnn import mRNN
 from mrnntorch.region.input_region import InputRegion
 from mrnntorch.region.recurrent_region import RecurrentRegion
 
