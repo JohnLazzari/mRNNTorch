@@ -97,9 +97,13 @@ class mLinearization:
             h = h.unsqueeze(0)
 
         # Get h_next for affine function
-        x_next, h_next = self.rnn(inp, x, h=h)
+        x_next, h_next = self.rnn(inp, x, h0=h)
 
         out = h_next if dh else x_next
+
+        # If there is only a single input there becomes a shape issue with squeezing
+        if delta_input.shape == (1,) and _jacobian_inp.dim() == 1:
+            _jacobian_inp = _jacobian_inp.unsqueeze(1)
 
         if _jacobian_exc is None or delta_h_static is None:
             pert = (
@@ -193,7 +197,7 @@ class mLinearization:
                 excluded_to_included.append(excluded_to_region)
             _jacobian = torch.cat(excluded_to_included, dim=0)
         else:
-            _jacobian = self.rnn.get_weight_subset(*self.region_list)
+            _jacobian = self.rnn.get_weight_subset(*self.region_list, W=_jacobian)
 
         return _jacobian.squeeze(), _jacobian_input.squeeze()
 

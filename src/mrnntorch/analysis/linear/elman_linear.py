@@ -69,6 +69,7 @@ class emLinearization:
 
         # Assert correct shapes
         assert input.dim() == 1
+        assert delta_input.dim() == 1
         assert h.dim() == 1
 
         if delta_h.dim() > 1:
@@ -88,6 +89,10 @@ class emLinearization:
 
         # Get h_next for affine function
         h_next = self.rnn(inp, h)
+
+        # If there is only a single input there becomes a shape issue with squeezing
+        if delta_input.shape == (1,) and _jacobian_inp.dim() == 1:
+            _jacobian_inp = _jacobian_inp.unsqueeze(1)
 
         if _jacobian_exc is None or delta_h_static is None:
             pert = (
@@ -164,7 +169,7 @@ class emLinearization:
                 excluded_to_included.append(excluded_to_region)
             _jacobian = torch.cat(excluded_to_included, dim=0)
         else:
-            _jacobian = self.rnn.get_weight_subset(*self.region_list)
+            _jacobian = self.rnn.get_weight_subset(*self.region_list, W=_jacobian)
 
         return _jacobian.squeeze(), _jacobian_input.squeeze()
 

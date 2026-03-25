@@ -27,8 +27,6 @@ DEFAULTS_MRNN = {
     "noise_level_inp": 0.01,
     "rec_constrained": True,
     "inp_constrained": True,
-    "dt": 10,
-    "tau": 100,
     "batch_first": True,
     "spectral_radius": None,
     "config_finalize": True,
@@ -49,8 +47,6 @@ class mRNNBase(nn.Module):
         noise_level_inp: float = DEFAULTS_MRNN["noise_level_inp"],
         rec_constrained: bool = DEFAULTS_MRNN["rec_constrained"],
         inp_constrained: bool = DEFAULTS_MRNN["inp_constrained"],
-        dt: float = DEFAULTS_MRNN["dt"],
-        tau: float = DEFAULTS_MRNN["tau"],
         batch_first: bool = DEFAULTS_MRNN["batch_first"],
         spectral_radius: float = DEFAULTS_MRNN["spectral_radius"],
         config_finalize: bool = DEFAULTS_MRNN["config_finalize"],
@@ -98,9 +94,6 @@ class mRNNBase(nn.Module):
         self.rec_constrained = rec_constrained
         self.inp_constrained = inp_constrained
         self.device = device
-        self.dt = dt
-        self.tau = tau
-        self.alpha = self.dt / self.tau
         self.batch_first = batch_first
         self.sigma_recur = noise_level_act
         self.sigma_input = noise_level_inp
@@ -1082,9 +1075,7 @@ class mRNNBase(nn.Module):
         Draws weights from a zero-mean normal with variance 1/(2H), then applies
         a sign mask to respect excitation/inhibition of source regions.
         """
-        nn.init.normal_(weight, mean=0, std=np.sqrt(1 / (2 * self.total_num_units)))
-        mask = torch.sign(weight)
-        weight *= mask
+        nn.init.uniform_(weight, a=0, b=np.sqrt(1 / (2 * self.total_num_units)))
 
     def _constrained_default_init_inp(self, weight: torch.Tensor):
         """Default init for input weights under Dale's Law constraints.
@@ -1092,13 +1083,11 @@ class mRNNBase(nn.Module):
         Draws weights from a zero-mean normal with variance 1/(H + I), then
         applies a sign mask to respect region sign.
         """
-        nn.init.normal_(
+        nn.init.uniform_(
             weight,
-            mean=0,
-            std=np.sqrt(1 / (self.total_num_units + self.total_num_inputs)),
+            a=0,
+            b=np.sqrt(1 / (self.total_num_units + self.total_num_inputs)),
         )
-        mask = torch.sign(weight)
-        weight *= mask
 
     def _ensure_order(self, *args) -> tuple[str]:
         """Reorder args if given regions are out of order"""

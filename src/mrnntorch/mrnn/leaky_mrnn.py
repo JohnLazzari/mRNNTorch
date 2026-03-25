@@ -16,12 +16,12 @@ DEFAULTS_MRNN = {
     "noise_level_inp": 0.01,
     "rec_constrained": True,
     "inp_constrained": True,
-    "dt": 10,
-    "tau": 100,
     "batch_first": True,
     "spectral_radius": None,
     "config_finalize": True,
     "device": "cuda",
+    "dt": 10,
+    "tau": 100,
 }
 
 
@@ -38,12 +38,12 @@ class mRNN(mRNNBase):
         noise_level_inp: float = DEFAULTS_MRNN["noise_level_inp"],
         rec_constrained: bool = DEFAULTS_MRNN["rec_constrained"],
         inp_constrained: bool = DEFAULTS_MRNN["inp_constrained"],
-        dt: float = DEFAULTS_MRNN["dt"],
-        tau: float = DEFAULTS_MRNN["tau"],
         batch_first: bool = DEFAULTS_MRNN["batch_first"],
         spectral_radius: float = DEFAULTS_MRNN["spectral_radius"],
         config_finalize: bool = DEFAULTS_MRNN["config_finalize"],
         device: str = DEFAULTS_MRNN["device"],
+        dt: float = DEFAULTS_MRNN["dt"],
+        tau: float = DEFAULTS_MRNN["tau"],
     ):
         super(mRNN, self).__init__(
             config,
@@ -52,8 +52,6 @@ class mRNN(mRNNBase):
             noise_level_inp,
             rec_constrained,
             inp_constrained,
-            dt,
-            tau,
             batch_first,
             spectral_radius,
             config_finalize,
@@ -92,6 +90,9 @@ class mRNN(mRNNBase):
                 connectivity after reading config. Default: True.
             device (str): Torch device string (e.g., "cpu" or "cuda"). Default: "cuda".
         """
+        self.dt = dt
+        self.tau = tau
+        self.alpha = dt / tau
 
     def batched_initial_condition(
         self, batch_size: int

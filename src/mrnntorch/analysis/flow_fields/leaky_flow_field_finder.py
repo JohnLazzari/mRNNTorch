@@ -290,9 +290,9 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
                 h_next = self.linearization(
                     inp_n,
                     states_n,
-                    h_states_n,
                     delta_inp_n,
                     delta_h,
+                    h=h_states_n,
                     delta_h_static=delta_h_static_n,
                     dh=dh,
                 )

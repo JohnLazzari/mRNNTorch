@@ -78,7 +78,7 @@ def _sample_trajectory(batch: int = 2, seq: int = 3, units: int = 3) -> torch.Te
 
 def test_flow_field_finder_init_sets_defaults_l():
     """Initializer should set hyperparameters and helper objects."""
-    mrnn = _build_leaky_mrnn()
+    mrnn = _build_leaky_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = mFlowFieldFinder(
         mrnn,
@@ -100,7 +100,7 @@ def test_flow_field_finder_init_sets_defaults_l():
 
 def test_reduce_traj_no_args_shape_l():
     """_reduce_traj should flatten [B,T,H] to [B*T,2]."""
-    mrnn = _build_leaky_mrnn()
+    mrnn = _build_leaky_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = mFlowFieldFinder(mrnn, fit_states, num_points=5, x_offset=10, y_offset=10)
     trajectory = _sample_trajectory()
@@ -112,7 +112,7 @@ def test_reduce_traj_no_args_shape_l():
 
 def test_inverse_grid_shapes_after_fit_l():
     """_inverse_grid should return consistent grid and inverse shapes."""
-    mrnn = _build_leaky_mrnn()
+    mrnn = _build_leaky_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = mFlowFieldFinder(mrnn, fit_states, num_points=4, x_offset=10, y_offset=10)
     trajectory = _sample_trajectory()
@@ -132,7 +132,7 @@ def test_inverse_grid_shapes_after_fit_l():
 
 def test_compute_velocity_and_speed_normalizes_l():
     """Velocity should be elementwise diffs and speed normalized to max 1."""
-    mrnn = _build_leaky_mrnn()
+    mrnn = _build_leaky_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = mFlowFieldFinder(mrnn, fit_states, num_points=10, x_offset=10, y_offset=10)
 
@@ -174,7 +174,7 @@ def test_find_nonlinear_flow_l():
 
 def test_flow_field_finder_init_sets_defaults_e():
     """Initializer should set hyperparameters and helper objects."""
-    mrnn = _build_elman_mrnn()
+    mrnn = _build_elman_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = emFlowFieldFinder(
         mrnn,
@@ -196,7 +196,7 @@ def test_flow_field_finder_init_sets_defaults_e():
 
 def test_reduce_traj_no_args_shape_e():
     """_reduce_traj should flatten [B,T,H] to [B*T,2]."""
-    mrnn = _build_elman_mrnn()
+    mrnn = _build_elman_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = emFlowFieldFinder(mrnn, fit_states, num_points=5, x_offset=5, y_offset=5)
     trajectory = _sample_trajectory()
@@ -208,7 +208,7 @@ def test_reduce_traj_no_args_shape_e():
 
 def test_inverse_grid_shapes_after_fit_e():
     """_inverse_grid should return consistent grid and inverse shapes."""
-    mrnn = _build_elman_mrnn()
+    mrnn = _build_elman_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = emFlowFieldFinder(mrnn, fit_states, num_points=4, x_offset=5, y_offset=5)
     trajectory = _sample_trajectory()
@@ -228,7 +228,7 @@ def test_inverse_grid_shapes_after_fit_e():
 
 def test_compute_velocity_and_speed_normalizes_e():
     """Velocity should be elementwise diffs and speed normalized to max 1."""
-    mrnn = _build_elman_mrnn()
+    mrnn = _build_elman_mrnn_with_inputs()
     fit_states = torch.zeros(size=(2, mrnn.total_num_units))
     finder = emFlowFieldFinder(mrnn, fit_states, num_points=5, x_offset=5, y_offset=5)
 

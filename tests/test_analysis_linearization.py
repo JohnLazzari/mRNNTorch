@@ -84,10 +84,10 @@ def test_linear_jacobian_matches_weight_l():
     x = torch.zeros(3)
     inp = torch.zeros(1)
     jac, jac_inp = lin.jacobian(inp, x)
-    print(jac)
-    print(mrnn.W_rec)
-    assert torch.allclose(jac, mrnn.W_rec.squeeze())
-    assert torch.allclose(jac_inp, mrnn.W_inp.squeeze())
+    assert torch.allclose(
+        jac, (1 - mrnn.alpha) * torch.eye(3) + mrnn.alpha * mrnn.W_rec.squeeze()
+    )
+    assert torch.allclose(jac_inp, mrnn.alpha * mrnn.W_inp.squeeze())
 
 
 def test_eigendecomposition_returns_real_imag_parts_l():
