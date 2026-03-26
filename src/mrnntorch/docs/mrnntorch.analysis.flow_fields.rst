@@ -1,15 +1,15 @@
-flow\_field
+elman\_flow\_field\_finder
 --------------------------------------------------
 
-.. automodule:: mrnntorch.analysis.flow_fields.flow_field
+.. automodule:: mrnntorch.analysis.flow_fields.elman_flow_field_finder
    :members:
    :show-inheritance:
    :undoc-members:
 
-flow\_field\_finder
+leaky\_flow\_field\_finder
 ----------------------------------------------------------
 
-.. automodule:: mrnntorch.analysis.flow_fields.flow_field_finder
+.. automodule:: mrnntorch.analysis.flow_fields.leaky_flow_field_finder
    :members:
    :show-inheritance:
    :undoc-members:

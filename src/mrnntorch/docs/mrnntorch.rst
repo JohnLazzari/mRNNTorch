@@ -3,7 +3,6 @@ mrnntorch
 
 region
 -----------
-
 .. toctree::
   :maxdepth: 1
 
@@ -16,10 +15,9 @@ analysis
 
   mrnntorch.analysis
 
-mrnntorch.mRNN
+mrnn
 ---------------------
+.. toctree::
+  :maxdepth: 1
 
-.. automodule:: mrnntorch.mRNN
-   :members:
-   :show-inheritance:
-   :undoc-members:
+  mrnntorch.mrnn

@@ -1,15 +1,15 @@
-fp
+elman\_fp\_finder
 ------------------------------------------
 
-.. automodule:: mrnntorch.analysis.fixed_points.fp
+.. automodule:: mrnntorch.analysis.fixed_points.elman_fp_finder
    :members:
    :show-inheritance:
    :undoc-members:
 
-fp\_finder
+leaky\_fp\_finder
 --------------------------------------------------
 
-.. automodule:: mrnntorch.analysis.fixed_points.fp_finder
+.. automodule:: mrnntorch.analysis.fixed_points.leaky_fp_finder
    :members:
    :show-inheritance:
    :undoc-members:
