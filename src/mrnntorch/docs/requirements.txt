@@ -5,3 +5,4 @@ torch
 scikit-learn
 scipy
 matplotlib
+rnntoolkit
