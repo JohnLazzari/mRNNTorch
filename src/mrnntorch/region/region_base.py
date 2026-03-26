@@ -38,6 +38,8 @@ DEFAULT_CONNECTIONS = {
 
 @dataclass
 class Connection:
+    """Container for a single inter-region connection and its masks."""
+
     parameter: torch.Tensor | None = None
     weight_mask: torch.Tensor | None = None
     sign_matrix: torch.Tensor | None = None
@@ -86,13 +88,7 @@ class Region(nn.Module):
         self._generate_masks()
 
     def __setitem__(self, idx: str | int, connection: Connection):
-        """
-        Implements the assignment operator
-
-        connection_info must be of the same structure as shown in add_connection
-        Usage:
-            cur_region[idx] = new_connection_info
-        """
+        """Assign a connection by destination name or insertion order index."""
         if isinstance(idx, int):
             # Get the current indexed connection
             connections_list = list(self.connections.keys())
@@ -106,12 +102,7 @@ class Region(nn.Module):
             raise Exception("Improper indexing type")
 
     def __getitem__(self, idx: str | int) -> Connection:
-        """
-        Indexes into the connection properties of region, using dict order
-
-        Usage:
-            region_sub = region[idx]
-        """
+        """Return a connection by destination name or insertion order index."""
 
         if isinstance(idx, int):
             # Get the current indexed connection
@@ -209,14 +200,7 @@ class Region(nn.Module):
         self.connections[dst_region_name] = connection_properties
 
     def has_connection_to(self, region: str) -> bool:
-        """
-        Checks if there is a connection from the current region to the specified region.
-
-        Args:
-            region (str): Name of the region to check for connection.
-        Returns:
-            bool: True if there is a connection, otherwise False.
-        """
+        """Return whether this region already defines a connection to ``region``."""
         return region in self.connections
 
     def _generate_masks(self):

@@ -6,6 +6,8 @@ from mrnntorch.mrnn.elman_mrnn import ElmanmRNN
 
 
 class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
+    """Flow-field estimator for Elman mRNN trajectories and local linearizations."""
+
     _default_hps = {
         "num_components": 2,
         "num_points": 50,
@@ -31,6 +33,21 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
         region_list: list = [],
         cancel_other_regions: bool = False,
     ):
+        """Initialize a 2D flow-field finder around a trajectory.
+
+        Args:
+            rnn (ElmanmRNN): Network to analyze.
+            fit_states (torch.Tensor): States used to fit the dimensionality
+                reduction used for the flow-field plane.
+            num_points (int): Number of grid points along each axis.
+            x_offset (int): Horizontal half-width of the sampled grid.
+            y_offset (int): Vertical half-width of the sampled grid.
+            x_center (int): Fixed x-axis center when not following the trajectory.
+            y_center (int): Fixed y-axis center when not following the trajectory.
+            follow_traj (bool): If ``True``, center the grid on each sampled state.
+            region_list (list): Recurrent regions to include in the reduced plane.
+            cancel_other_regions (bool): If ``True``, zero activity in excluded regions.
+        """
         super().__init__(
             rnn,
             fit_states,
@@ -40,17 +57,6 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
             x_center,
             y_center,
         )
-        """
-        Flow field that gathers a flow field about a specified trajectory
-
-        Args:
-            mrnn (mRNN): mRNN object
-            num_points (int): number of points to use in grid, results in (num_points, num_points)
-            x_offset (int): scale to offset grid about trajectory in x direction
-            y_offset (int): scale to offset grid about trajectory in y direction
-            cancel_other_regions (bool): whether or not to zero out activity from other regions
-            follow_traj (bool): whether or not to center the grid around each trajectory
-        """
 
         # Unload mrnn specific kwargs
         self.cancel_other_regions = cancel_other_regions
@@ -80,7 +86,7 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
         stim_input: torch.Tensor | None = None,
         W: torch.Tensor | None = None,
     ) -> list:
-        """Compute 2D flow fields in a region subspace along a trajectory.
+        """Compute nonlinear 2D flow fields in a region subspace along a trajectory.
 
         Projects selected region activity onto a 2D PCA subspace, constructs a grid
         around the current point, and advances the system by one step to estimate
@@ -217,20 +223,19 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
         delta_inp: torch.Tensor,
         delta_h_static: torch.Tensor | None = None,
     ) -> list:
-        """Compute linearized flow fields in a 2D subspace.
+        """Compute linearized 2D flow fields around sampled trajectory states.
 
         Similar to :func:`flow_field`, but uses a local linear approximation (Jacobian)
         of the dynamics around points on the trajectory instead of a full forward
         step. Assumes no external input to the selected regions.
 
         Args:
-            states (torch.Tensor): Hidden activations over time for selected regions, [n, d]
+            states (torch.Tensor): Hidden activations over time.
+            inp (torch.Tensor): External input sequence aligned with ``states``.
+            delta_inp (torch.Tensor): Input perturbations for the local linear model.
+            delta_h_static (torch.Tensor | None): Perturbations for recurrent regions
+                excluded from the reduced plane.
 
-        Kwargs:
-            delta_h (torch.Tensor): tensor containing delta of regions considered to be \
-            static, i.e. regions not included in region list, which are not part of the grid
-
-            traj_to_reduce (torch.Tensor): tensor similar to states that will be used for PCA instead of states
         Returns:
             list: FlowField objects per sampled time.
         """

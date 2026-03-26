@@ -9,6 +9,8 @@ from mrnntorch.mrnn.leaky_mrnn import mRNN
 
 
 class mFixedPointFinder(FixedPointFinderBase[mRNN]):
+    """Fixed-point finder specialized for leaky :class:`mRNN` dynamics."""
+
     _default_hps = {
         "lr_init": 1e-4,
         "lr_patience": 5,
@@ -73,55 +75,32 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         super_verbose: bool = _default_hps["super_verbose"],
         n_iters_per_print_update: int = _default_hps["n_iters_per_print_update"],
     ):
+        """Initialize fixed-point search hyperparameters for a leaky mRNN.
+
+        Args:
+            rnn (mRNN): Network whose fixed points will be optimized.
+            lr_init (float): Initial optimizer learning rate.
+            lr_patience (float): Plateau scheduler patience.
+            lr_factor (float): Plateau scheduler decay factor.
+            lr_cooldown (float): Plateau scheduler cooldown.
+            tol_q (float): Absolute fixed-point objective tolerance.
+            tol_dq (float): Per-step objective improvement tolerance.
+            max_iters (int): Maximum optimization iterations.
+            do_rerun_q_outliers (bool): Whether to rerun optimization on high-q outliers.
+            outlier_q_scale (float): Multiplier used to classify q outliers.
+            do_exclude_distance_outliers (bool): Whether to discard distant fixed points.
+            outlier_distance_scale (float): Distance threshold scale for outlier removal.
+            tol_unique (float): Tolerance used to collapse duplicate fixed points.
+            max_n_unique (int): Maximum number of unique fixed points to retain.
+            dtype (str): Torch dtype name used during optimization.
+            random_seed (int): Random seed for reproducible sampling.
+            verbose (bool): Whether to print high-level progress.
+            super_verbose (bool): Whether to print per-iteration progress.
+            n_iters_per_print_update (int): Iteration interval between progress prints.
+        """
         super().__init__(
             rnn,
         )
-
-        """Creates a FixedPointFinder object.
-        Inherited from FixedPointFinderBase
-
-        Optimization terminates once every initialization satisfies one or
-        both of the following criteria:
-            1. q < tol_q
-            2. dq < tol_dq * learning_rate
-
-        Args:
-            rnn_cell: A Pytorch RNN
-            tol_q (optional): A positive scalar specifying the optimization
-                termination criteria on each q-value. Default: 1e-12.
-            tol_dq (optional): A positive scalar specifying the optimization
-                termination criteria on the improvement of each q-value (i.e.,
-                "dq") from one optimization iteration to the next.
-            max_iters (optional): A non-negative integer specifying the
-                maximum number of gradient descent iterations allowed.
-            do_rerun_q_outliers (optional): A bool indicating whether or not
-                to run additional optimization iterations on putative outlier
-                states
-            outlier_q_scale (optional): A positive float specifying the q
-                value for putative outlier fixed points, relative to the median q
-                value across all identified fixed points. Default: 10.
-            do_exclude_distance_outliers (optional): A bool indicating
-                whether or not to discard states that are far away from the set
-                of initial states
-            outlier_distance_scale (optional): A positive float specifying a
-                normalized distance cutoff used to exclude distance outliers
-            tol_unique (optional): A positive scalar specifying the numerical
-                precision required to label two fixed points as being unique from
-                one another. 
-            max_n_unique (optional): A positive integer indicating the max
-                number of unique fixed points to keep.
-            dtype: string indicating the data type to use for all numerical ops
-                and objects. Default: 'float32'
-            random_seed: Seed for numpy random number generator. Default: 0.
-            verbose (optional): A bool indicating whether to print high-level
-                status updates. Default: True.
-            super_verbose (optional): A bool indicating whether or not to
-                print per-iteration updates during each optimization. Default:
-                False.
-            n_iters_per_print_update (optional): An int specifying how often
-                to print updates during the fixed point optimizations. Default:
-                100.
-        """
 
         self.dtype = dtype
         self.device = next(rnn.parameters()).device
@@ -255,24 +234,17 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         stim_inp: torch.Tensor | None = None,
         W_rec: torch.Tensor | None = None,
     ) -> FixedPointCollection:
-        """Detects outlier states with respect to the q function and runs
-        additional optimization iterations on those states This should only be
-        used after calling either _run_joint_optimization or
-        _run_sequential_optimizations.
+        """Rerun optimization on candidate fixed points with unusually large q.
 
         Args:
-            fps: A FixedPoints object containing (partially) optimized
-            fixed points and associated metadata.
-
-            stim_inp: additional stimulus to give network during optimization
-
-            W_rec: replaces self.mrnn.W_rec during forward pass
-
-            W_inp: replaces self.mrnn.W_inp during forward pass
+            fps (FixedPointCollection): Candidate fixed points from a prior run.
+            *args (str): Optional recurrent regions to optimize.
+            n_rounds (int): Number of rerun rounds to perform.
+            stim_inp (torch.Tensor | None): Optional stimulus input during reruns.
+            W_rec (torch.Tensor | None): Optional recurrent weight matrix override.
 
         Returns:
-            A FixedPoints object containing the further-optimized fixed points
-            and associated metadata.
+            FixedPointCollection: Updated fixed-point collection.
         """
 
         """
@@ -289,6 +261,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         def perform_outlier_optimization(
             fps: FixedPointCollection,
         ) -> FixedPointCollection:
+            """Optimize only the currently identified q outliers."""
             idx_outliers = self.identify_q_outliers(fps, outlier_min_q)
 
             outlier_fps = fps[idx_outliers.tolist()]
@@ -321,6 +294,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
             return fps
 
         def outlier_update(fps: FixedPointCollection) -> torch.Tensor:
+            """Identify the current q outliers and report their count."""
             idx_outliers = self.identify_q_outliers(fps, outlier_min_q)
             n_outliers = len(idx_outliers)
 
@@ -352,26 +326,17 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         stim_inp: torch.Tensor | None = None,
         W_rec: torch.Tensor | None = None,
     ) -> FixedPointCollection:
-        """Finds multiple fixed points via a joint optimization over multiple
-        state vectors.
+        """Optimize a batch of candidate states toward fixed points jointly.
 
         Args:
-            initial_states: Tensor specifying the initial
-            states of the RNN, from which the optimization will search for
-            fixed points.
-
-            ext_inp: Tensor specifying a set of constant
-            inputs into the RNN.
-
-            stim_inp: Tensor specifying additional stimulus to the network
-
-            W_rec: replaces self.mrnn.W_rec in forward
-
-            W_inp: replaces self.mrnn.W_inp in forward
+            initial_states (torch.Tensor): Initial recurrent states to optimize.
+            ext_inp (torch.Tensor): Constant external inputs paired with each state.
+            *args (str): Optional recurrent regions to optimize.
+            stim_inp (torch.Tensor | None): Optional stimulus input during optimization.
+            W_rec (torch.Tensor | None): Optional recurrent weight matrix override.
 
         Returns:
-            fps: A FixedPoints object containing the optimized fixed points
-            and associated metadata.
+            FixedPointCollection: Optimized fixed points and optimization metadata.
         """
 
         # Get batch and time dims
@@ -451,13 +416,11 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
 
         while True:
             x = torch.cat(region_tensor_list, dim=-1)
-            h = self.rnn.activation(x)
 
             F_x_1xbxd, _ = self.rnn(
                 ext_inp,
                 x,
-                h,
-                stim_inp,
+                stim_input=stim_inp,
                 noise=False,
                 W_rec=W_rec,
             )
@@ -479,7 +442,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
             q_scalar.backward()
 
             optimizer.step()
-            scheduler.step(metrics=q_scalar)
+            scheduler.step(metrics=q_scalar.detach())
 
             iter_learning_rate = scheduler.state_dict()["_last_lr"][0]
 
@@ -548,9 +511,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
     def _exclude_distance_outliers(
         self, fps: FixedPointCollection, initial_states: torch.Tensor
     ) -> FixedPointCollection:
-        """Removes putative distance outliers from a set of fixed points.
-        See docstring for identify_distance_non_outliers(...).
-        """
+        """Drop fixed points that are too far from the supplied initial states."""
 
         idx_keep = self.get_fp_non_distance_outliers(
             fps, initial_states, self.outlier_distance_scale
@@ -558,6 +519,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         return fps[idx_keep.tolist()]
 
     def _print_if_verbose(self, *args, **kwargs):
+        """Print only when verbose logging is enabled."""
         if self.verbose:
             print(*args, **kwargs)
 
@@ -571,6 +533,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         lr: float,
         is_final: bool = False,
     ):
+        """Print a standardized optimization progress line."""
         t = time.time()
         t_elapsed = t - t_start
         avg_iter_time = t_elapsed / iter_count

@@ -8,12 +8,12 @@ class InputRegion(Region):
         sign=DEFAULT_REGION_BASE["sign"],
         device=DEFAULT_REGION_BASE["device"],
     ):
-        # Implements base region class
-        super(InputRegion, self).__init__(num_units, sign=sign, device=device)
-        """Input region (inherits from :class:`Region`).
+        """Initialize an input region.
 
         Args:
             num_units (int): Number of input channels.
             sign (str): "pos" or "neg" indicating sign mask for inputs.
             device (str): Torch device string.
         """
+        # Implements base region class
+        super(InputRegion, self).__init__(num_units, sign=sign, device=device)

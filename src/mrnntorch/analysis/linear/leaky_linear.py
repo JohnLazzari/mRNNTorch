@@ -1,21 +1,23 @@
 import torch
 from mrnntorch.mrnn.leaky_mrnn import mRNN
 from typing import Tuple
+import warnings
 
 
 class mLinearization:
+    """Local linear analysis utilities for leaky :class:`mRNN` models."""
+
     def __init__(
         self,
         rnn: mRNN,
         *args,
     ):
-        """
-        Linearization object that stores methods for local analyses of mRNNs
+        """Initialize the linearization helper for a model and region subset.
 
         Args:
-            mrnn: mRNN object
-            W_inp: Custom input weights to be used when linearizing
-            W_rec: Custom recurrent weights to be used when linearizing
+            rnn (mRNN): Network to analyze.
+            *args (str): Optional recurrent region names to include in the
+                linearized subspace. If omitted, all recurrent regions are used.
         """
         self.rnn = rnn
         # Regions which are treated as grid elements
@@ -47,6 +49,7 @@ class mLinearization:
         delta_h_static: torch.Tensor | None = None,
         dh: bool = False,
     ) -> torch.Tensor:
+        """Alias for :meth:`forward`."""
         return self.forward(
             input, x, delta_input, delta_h, h=h, delta_h_static=delta_h_static, dh=dh
         )
@@ -61,14 +64,22 @@ class mLinearization:
         delta_h_static: torch.Tensor | None = None,
         dh: bool = False,
     ) -> torch.Tensor:
-        """
-        First order taylor expansion of RNN at a given point and input
+        """Evaluate the first-order Taylor approximation of the leaky dynamics.
 
         Args:
-            inp: 1D tensor of input for network at a given state
-            h: 1D tensor of network state to linearize about
-            delta_inp: perturbation of input
-            delta_h: perturbation of state
+            input (torch.Tensor): External input at the operating point.
+            x (torch.Tensor): Pre-activation state about which to linearize.
+            delta_input (torch.Tensor): Input perturbation.
+            delta_h (torch.Tensor): Perturbation for the included region subset.
+            h (torch.Tensor | None): Activation corresponding to ``x`` when
+                linearizing hidden activations directly.
+            delta_h_static (torch.Tensor | None): Perturbation applied to excluded
+                regions when only a subset of regions is linearized.
+            dh (bool): If ``True``, linearize the hidden activation update instead
+                of the pre-activation update.
+
+        Returns:
+            torch.Tensor: Linearized next state in the requested coordinates.
         """
 
         # Assert correct shapes
@@ -129,22 +140,20 @@ class mLinearization:
         excluded_regions: bool = False,
         dh: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Linearize the dynamics around a state and return the Jacobian.
-
-        Computes the Jacobian of the mRNN update with respect to the hidden state
-        evaluated at the provided state ``x`` and (optionally) a subset of regions
-        defined by ``*args``. If ``W_inp`` is provided, also returns the Jacobian
-        with respect to the input.
+        """Return Jacobians of the leaky update with respect to state and input.
 
         Args:
-            x (torch.Tensor): 1D or batched tensor representing the pre-activation state at which to
-                linearize (shape ``[H]``).
-            *args (str): Optional region names specifying a subset for the Jacobian.
-            alpha (float): Discretization factor used in the update.
+            input (torch.Tensor): Input vector at which to linearize.
+            x (torch.Tensor): Pre-activation state at which to linearize.
+            h (torch.Tensor | None): Hidden activation used when ``dh`` is ``True``.
+            excluded_regions (bool): If ``True``, return the projection from
+                excluded recurrent regions into the included region subset.
+            dh (bool): If ``True``, differentiate the hidden activation output
+                rather than the pre-activation state output.
 
         Returns:
-            torch.Tensor | tuple[torch.Tensor, torch.Tensor]: Jacobian w.r.t. hidden
-            state, and optionally (Jacobian w.r.t. input) if ``W_inp`` is provided.
+            Tuple[torch.Tensor, torch.Tensor]: Jacobian with respect to state
+            followed by Jacobian with respect to input.
         """
 
         assert isinstance(excluded_regions, bool)
@@ -161,6 +170,9 @@ class mLinearization:
 
         input = input.unsqueeze(0).unsqueeze(0)
         x = x.unsqueeze(0)
+
+        if h is not None and not dh:
+            warnings.warn("Provided h will be ignored since dh is False. If you want to include h, set dh to True.")
 
         # Only pay attention to h if dh is true
         # if dh is False, h will be ignored
@@ -208,12 +220,13 @@ class mLinearization:
         h: torch.Tensor | None = None,
         dh: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Linearize the network and compute eigen decomposition.
+        """Compute the eigendecomposition of the local Jacobian.
 
         Args:
-            x (torch.Tensor): 1D hidden state where the system is linearized.
-            *args (str): Optional subset of regions to consider.
-            alpha (float): Discretization factor.
+            input (torch.Tensor): Input vector at which to linearize.
+            x (torch.Tensor): Pre-activation state at which to linearize.
+            h (torch.Tensor | None): Hidden activation used when ``dh`` is ``True``.
+            dh (bool): If ``True``, eigendecompose the hidden-state Jacobian.
 
         Returns:
             torch.Tensor: Real parts of eigenvalues.

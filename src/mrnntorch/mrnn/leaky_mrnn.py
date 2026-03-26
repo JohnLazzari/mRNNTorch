@@ -26,10 +26,13 @@ DEFAULTS_MRNN = {
 
 
 def linear(x):
+    """Return ``x`` unchanged."""
     return x
 
 
 class mRNN(mRNNBase):
+    """Leaky multi-regional RNN with separate pre-activation and activation states."""
+
     def __init__(
         self,
         config: str = DEFAULTS_MRNN["config"],
@@ -45,6 +48,22 @@ class mRNN(mRNNBase):
         dt: float = DEFAULTS_MRNN["dt"],
         tau: float = DEFAULTS_MRNN["tau"],
     ):
+        """Initialize a leaky multi-regional RNN.
+
+        Args:
+            config (str | None): Optional JSON config path.
+            activation (str): Hidden activation function name.
+            noise_level_act (float): Hidden-state noise scale.
+            noise_level_inp (float): Input noise scale.
+            rec_constrained (bool): Whether recurrent weights obey Dale's law.
+            inp_constrained (bool): Whether input weights obey Dale's law.
+            batch_first (bool): Whether sequences are batch-major.
+            spectral_radius (float | None): Optional recurrent spectral-radius target.
+            config_finalize (bool): Whether to finalize connectivity after config load.
+            device (str): Torch device string.
+            dt (float): Discretization step.
+            tau (float): Time constant.
+        """
         super(mRNN, self).__init__(
             config,
             activation,
@@ -57,39 +76,6 @@ class mRNN(mRNNBase):
             config_finalize,
             device,
         )
-        """
-        Multi-Regional Recurrent Neural Network (mRNN).
-
-        Simulates interactions between multiple recurrent "regions" with optional
-        input regions. Supports Dale's Law constraints, tonic inputs, noise in
-        hidden state and inputs, and basic step-wise dynamics with configurable
-        discretization parameters.
-
-        Key features:
-        - Multiple regions with independent sizes and signs (excitatory/inhibitory)
-        - Dale's Law constraints via sign masks on weights
-        - Optional noise on hidden state and input
-        - Tonic (baseline) input per region
-        - JSON-based configuration or fully manual construction
-
-        Args:
-            config (str | None): Path to a JSON configuration file describing
-                recurrent regions, input regions, and their connections. If None,
-                build the network manually by calling the add_* methods.
-            activation (str): One of {"relu", "tanh", "sigmoid", "softplus", "linear"}.
-            noise_level_act (float): Std of hidden-state noise term. Default: 0.01.
-            noise_level_inp (float): Std of input noise term. Default: 0.01.
-            rec_constrained (bool): If True, apply Dale's Law to rec regions. Default: True.
-            inp_constrained (bool): If True, apply Dale's Law to inp regions. Default: True.
-            dt (float): Discrete step in ms used for the Euler update. Default: 10.
-            tau (float): Time constant in ms; alpha = dt / tau. Default: 100.
-            batch_first (bool): If True, sequences are [B, T, ...]; else [T, B, ...].
-            spectral_radius (float | None): If set, scales recurrent weights so the
-                spectral radius equals this value after finalization.
-            config_finalize (bool): If True and a config is supplied, finalize
-                connectivity after reading config. Default: True.
-            device (str): Torch device string (e.g., "cpu" or "cuda"). Default: "cuda".
-        """
         self.dt = dt
         self.tau = tau
         self.alpha = dt / tau
@@ -97,15 +83,7 @@ class mRNN(mRNNBase):
     def batched_initial_condition(
         self, batch_size: int
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Return initial condition expanded to meet batch_size
-
-        Args:
-            batch_size (int): batch size to expand to
-
-        Returns:
-            xn, hn (Tensor, Tensor): initial preactivation and hidden activation
-        """
+        """Return batched initial pre-activation and activation states."""
         xn = self.initial_condition.unsqueeze(0).repeat(batch_size, 1)
         hn = self.initial_condition.unsqueeze(0).repeat(batch_size, 1)
         return xn, hn

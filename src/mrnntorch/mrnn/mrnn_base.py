@@ -414,10 +414,10 @@ class mRNNBase(nn.Module):
         """Scale recurrent weights so their spectral radius matches ``self.spectral_radius``.
 
         Usage:
-        1. Define regions and connections (via config or manual methods).
-        2. If building manually, call :meth:`finalize_connectivity` first.
-        3. Set ``self.spectral_radius`` and call this method.
-        4. W_tmp will compute spectral radius of another network (i.e dales law network)
+            1. Define regions and connections (via config or manual methods).
+            2. If building manually, call :meth:`finalize_connectivity` first.
+            3. Set ``self.spectral_radius`` and call this method.
+            4. W_tmp will compute spectral radius of another network (i.e dales law network)
         """
         # Compute spectral radius
         if W_tmp is not None:

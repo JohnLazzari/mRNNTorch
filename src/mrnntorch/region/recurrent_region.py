@@ -14,8 +14,7 @@ class RecurrentRegion(Region):
         learnable_bias=DEFAULT_REC_REGIONS["learnable_bias"],
         device=DEFAULT_REC_REGIONS["device"],
     ):
-        super(RecurrentRegion, self).__init__(num_units, sign=sign, device=device)
-        """Recurrent region (inherits from :class:`Region`).
+        """Initialize a recurrent region.
 
         Args:
             num_units (int): Number of units in the region.
@@ -26,6 +25,7 @@ class RecurrentRegion(Region):
             parent_region (str | None): Optional parent identifier.
             learnable_bias (bool): If True, make ``base_firing`` a trainable parameter.
         """
+        super(RecurrentRegion, self).__init__(num_units, sign=sign, device=device)
 
         self.init = init * torch.ones(size=(self.num_units,))
         self.learnable_bias = learnable_bias

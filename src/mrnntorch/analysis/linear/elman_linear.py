@@ -4,18 +4,19 @@ from typing import Tuple
 
 
 class emLinearization:
+    """Local linear analysis utilities for :class:`ElmanmRNN` models."""
+
     def __init__(
         self,
         rnn: ElmanmRNN,
         *args,
     ):
-        """
-        Linearization object that stores methods for local analyses of mRNNs
+        """Initialize the linearization helper for a model and region subset.
 
         Args:
-            mrnn: mRNN object
-            W_inp: Custom input weights to be used when linearizing
-            W_rec: Custom recurrent weights to be used when linearizing
+            rnn (ElmanmRNN): Network to analyze.
+            *args (str): Optional recurrent region names to include in the
+                linearized subspace. If omitted, all recurrent regions are used.
         """
         self.rnn = rnn
         # Regions which are treated as grid elements
@@ -45,6 +46,7 @@ class emLinearization:
         delta_h: torch.Tensor,
         delta_h_static: torch.Tensor | None = None,
     ) -> torch.Tensor:
+        """Alias for :meth:`forward`."""
         return self.forward(
             input, h, delta_input, delta_h, delta_h_static=delta_h_static
         )
@@ -57,14 +59,18 @@ class emLinearization:
         delta_h: torch.Tensor,
         delta_h_static: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """
-        First order taylor expansion of RNN at a given point and input
+        """Evaluate the first-order Taylor approximation of the Elman dynamics.
 
         Args:
-            inp: 1D tensor of input for network at a given state
-            h: 1D tensor of network state to linearize about
-            delta_inp: perturbation of input
-            delta_h: perturbation of state
+            input (torch.Tensor): External input at the operating point.
+            h (torch.Tensor): Hidden state about which to linearize.
+            delta_input (torch.Tensor): Input perturbation.
+            delta_h (torch.Tensor): Hidden-state perturbation for included regions.
+            delta_h_static (torch.Tensor | None): Perturbation applied to excluded
+                regions when only a subset of regions is linearized.
+
+        Returns:
+            torch.Tensor: Linearized next hidden state.
         """
 
         # Assert correct shapes
@@ -116,22 +122,17 @@ class emLinearization:
         h: torch.Tensor,
         excluded_regions: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Linearize the dynamics around a state and return the Jacobian.
-
-        Computes the Jacobian of the mRNN update with respect to the hidden state
-        evaluated at the provided state ``x`` and (optionally) a subset of regions
-        defined by ``*args``. If ``W_inp`` is provided, also returns the Jacobian
-        with respect to the input.
+        """Return Jacobians of the Elman update with respect to state and input.
 
         Args:
-            x (torch.Tensor): 1D or batched tensor representing the pre-activation state at which to
-                linearize (shape ``[H]``).
-            *args (str): Optional region names specifying a subset for the Jacobian.
-            alpha (float): Discretization factor used in the update.
+            input (torch.Tensor): Input vector at which to linearize.
+            h (torch.Tensor): Hidden state at which to linearize.
+            excluded_regions (bool): If ``True``, return the projection from
+                excluded recurrent regions into the included region subset.
 
         Returns:
-            torch.Tensor | tuple[torch.Tensor, torch.Tensor]: Jacobian w.r.t. hidden
-            state, and optionally (Jacobian w.r.t. input) if ``W_inp`` is provided.
+            Tuple[torch.Tensor, torch.Tensor]: Jacobian with respect to hidden
+            state followed by Jacobian with respect to input.
         """
 
         assert isinstance(excluded_regions, bool)
@@ -178,12 +179,11 @@ class emLinearization:
         input: torch.Tensor,
         h: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Linearize the network and compute eigen decomposition.
+        """Compute the eigendecomposition of the local hidden-state Jacobian.
 
         Args:
-            x (torch.Tensor): 1D hidden state where the system is linearized.
-            *args (str): Optional subset of regions to consider.
-            alpha (float): Discretization factor.
+            input (torch.Tensor): Input vector at which to linearize.
+            h (torch.Tensor): Hidden state at which to linearize.
 
         Returns:
             torch.Tensor: Real parts of eigenvalues.
