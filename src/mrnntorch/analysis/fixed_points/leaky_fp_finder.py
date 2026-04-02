@@ -338,6 +338,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         Returns:
             FixedPointCollection: Optimized fixed points and optimization metadata.
         """
+        # TODO add option for finding fixed points on h
 
         # Get batch and time dims
         if self.batch_first:

@@ -220,7 +220,6 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
         input: torch.Tensor,
         delta_input: torch.Tensor,
         delta_state_static: torch.Tensor | None = None,
-        dh: bool = False,
     ) -> list:
         """Compute linearized 2D flow fields around sampled trajectory states.
 
@@ -296,28 +295,16 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
                 This should be ok since it is a general perturbation still
             """
             delta_x = inverse_grid - region_xs_n
-            h_states_n = self.rnn.activation(xs_n)
 
             with torch.no_grad():
                 # get next state of h or of x if dh is false
-                if dh:
-                    state_next = self.linearization(
-                        input_n,
-                        xs_n,
-                        delta_input_n,
-                        delta_x,
-                        delta_state_static=delta_state_static_n,
-                        h=h_states_n,
-                        dh=dh,
-                    )
-                else:
-                    state_next = self.linearization(
-                        input_n,
-                        xs_n,
-                        delta_input_n,
-                        delta_x,
-                        delta_state_static=delta_state_static_n,
-                    )
+                state_next = self.linearization(
+                    input_n,
+                    xs_n,
+                    delta_input_n,
+                    delta_x,
+                    delta_state_static=delta_state_static_n,
+                )
 
             # Put next h into a grid format
             state_next = self.rnn.get_region_activity(state_next, *self.region_list)
