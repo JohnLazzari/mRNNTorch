@@ -81,8 +81,8 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
 
     def find_nonlinear_flow(
         self,
-        states: torch.Tensor,
-        inp: torch.Tensor,
+        xs: torch.Tensor,
+        input: torch.Tensor,
         stim_input: torch.Tensor | None = None,
         W: torch.Tensor | None = None,
     ) -> list:
@@ -111,39 +111,37 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
         flow_field_list = []
 
         if stim_input is None:
-            stim_input = torch.zeros_like(states, dtype=self.dtype)
+            stim_input = torch.zeros_like(xs, dtype=self.dtype)
 
         # Reshape to nxd
-        states, inp, stim_input = (
-            self._nxd(states),
-            self._nxd(inp),
+        xs, input, stim_input = (
+            self._nxd(xs),
+            self._nxd(input),
             self._nxd(stim_input),
         )
 
-        assert states.shape[0] == inp.shape[0]
-        n_states = states.shape[0]
+        assert xs.shape[0] == input.shape[0]
+        n_states = xs.shape[0]
 
         # get region activity for fitting and reduction
-        tmp_states = self.rnn.get_region_activity(states, *self.region_list)
+        tmp_states = self.rnn.get_region_activity(xs, *self.region_list)
         reduced_traj = self._reduce_traj(tmp_states)
 
         if not self.static_region_list:
             # Default to dummy tensor with shape
-            static_states = None
+            static_xs = None
         else:
-            static_states = self.rnn.get_region_activity(
-                states, *self.static_region_list
-            )
+            static_xs = self.rnn.get_region_activity(xs, *self.static_region_list)
 
             if self.cancel_other_regions:
-                static_states = static_states * torch.zeros_like(static_states)
+                static_xs = static_xs * torch.zeros_like(static_xs)
 
         # Now going through trajectory
         for n in range(n_states):
             # default for static states
             reduced_traj_n = reduced_traj[n]
-            inp_n = inp[n]
-            static_states_n = static_states[n] if static_states is not None else None
+            input_n = input[n]
+            static_xs_n = static_xs[n] if static_xs is not None else None
             stim_input_n = stim_input[n]
 
             # If follow trajectory is true get grid centered around current t
@@ -165,19 +163,19 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
             )
 
             # Repeat along the batch dimension to match the grid
-            if static_states_n is not None:
-                static_act_batch = static_states_n.repeat(low_dim_grid.shape[0], 1)
+            if static_xs_n is not None:
+                static_xs_batch = static_xs_n.repeat(low_dim_grid.shape[0], 1)
             else:
-                static_act_batch = None
+                static_xs_batch = None
 
-            full_inp_batch = inp_n.repeat(low_dim_grid.shape[0], 1)
+            full_input_batch = input_n.repeat(low_dim_grid.shape[0], 1)
             full_stim_batch = stim_input_n.repeat(low_dim_grid.shape[0], 1)
 
             # Combine the grid and static states to treat excluded regions as input
-            if static_act_batch is not None:
+            if static_xs_batch is not None:
                 grid_flow = self.rnn.combine_states(
                     inverse_grid,
-                    static_act_batch,
+                    static_xs_batch,
                     self.region_list,
                     self.static_region_list,
                 )
@@ -191,7 +189,7 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
             with torch.no_grad():
                 # Get activity for current timestep
                 x_next, _ = self.rnn(
-                    full_inp_batch.unsqueeze(self.time_dim),
+                    full_input_batch.unsqueeze(self.time_dim),
                     x_0_flow,
                     h_0_flow,
                     stim_input=full_stim_batch.unsqueeze(self.time_dim),
@@ -218,10 +216,10 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
 
     def find_linear_flow(
         self,
-        states: torch.Tensor,
-        inp: torch.Tensor,
-        delta_inp: torch.Tensor,
-        delta_h_static: torch.Tensor | None = None,
+        xs: torch.Tensor,
+        input: torch.Tensor,
+        delta_input: torch.Tensor,
+        delta_state_static: torch.Tensor | None = None,
         dh: bool = False,
     ) -> list:
         """Compute linearized 2D flow fields around sampled trajectory states.
@@ -234,8 +232,8 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
             states (torch.Tensor): Network states over time.
             inp (torch.Tensor): External input sequence aligned with ``states``.
             delta_inp (torch.Tensor): Input perturbations for the local linear model.
-            delta_h_static (torch.Tensor | None): Perturbations for recurrent regions
-                excluded from the reduced plane.
+            delta_state_static (torch.Tensor | None): Perturbations for recurrent regions \
+                excluded from the reduced plane. Should be for x or h depending on dh
             dh (bool): If ``True``, linearize hidden activations instead of
                 pre-activations.
 
@@ -244,29 +242,33 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
         """
 
         # reshape to nxd
-        states, inp, delta_inp = self._nxd(states), self._nxd(inp), self._nxd(delta_inp)
+        xs, input, delta_input = self._nxd(xs), self._nxd(input), self._nxd(delta_input)
 
-        assert inp.shape[0] == delta_inp.shape[0]
-        assert states.shape[0] == inp.shape[0]
-        n_states = states.shape[0]
+        assert input.shape[0] == delta_input.shape[0]
+        assert xs.shape[0] == input.shape[0]
+        n_states = xs.shape[0]
 
         # Lists for x and y velocities
         flow_field_list = []
 
         # Activity specific to regions in region list for later computations
-        region_tmp = self.rnn.get_region_activity(states, *self.region_list)
+        region_tmp = self.rnn.get_region_activity(xs, *self.region_list)
         reduced_traj = self._reduce_traj(region_tmp)
 
         # zero out static perturbations if regions are cancelled
-        if self.cancel_other_regions and delta_h_static is not None:
-            delta_h_static = delta_h_static * torch.zeros_like(delta_h_static)
+        if self.cancel_other_regions and delta_state_static is not None:
+            delta_state_static = delta_state_static * torch.zeros_like(
+                delta_state_static
+            )
 
         for n in range(n_states):
-            states_n = states[n]
+            xs_n = xs[n]
             reduced_traj_n = reduced_traj[n]
-            inp_n = inp[n]
-            delta_inp_n = delta_inp[n]
-            delta_h_static_n = delta_h_static[n] if delta_h_static is not None else None
+            input_n = input[n]
+            delta_input_n = delta_input[n]
+            delta_state_static_n = (
+                delta_state_static[n] if delta_state_static is not None else None
+            )
 
             # If follow trajectory is true get grid centered around current t
             # This will make a different grid for each state (n grids)
@@ -288,28 +290,41 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
             )
 
             # Get a perturbation of the activity
-            region_states_n = self.rnn.get_region_activity(states_n, *self.region_list)
-            delta_h = inverse_grid - region_states_n
-
-            h_states_n = self.rnn.activation(states_n)
+            region_xs_n = self.rnn.get_region_activity(xs_n, *self.region_list)
+            """
+                This assumes delta state is always of x 
+                This should be ok since it is a general perturbation still
+            """
+            delta_x = inverse_grid - region_xs_n
+            h_states_n = self.rnn.activation(xs_n)
 
             with torch.no_grad():
-                h_next = self.linearization(
-                    inp_n,
-                    states_n,
-                    delta_inp_n,
-                    delta_h,
-                    h=h_states_n,
-                    delta_h_static=delta_h_static_n,
-                    dh=dh,
-                )
+                # get next state of h or of x if dh is false
+                if dh:
+                    state_next = self.linearization(
+                        input_n,
+                        xs_n,
+                        delta_input_n,
+                        delta_x,
+                        delta_state_static=delta_state_static_n,
+                        h=h_states_n,
+                        dh=dh,
+                    )
+                else:
+                    state_next = self.linearization(
+                        input_n,
+                        xs_n,
+                        delta_input_n,
+                        delta_x,
+                        delta_state_static=delta_state_static_n,
+                    )
 
             # Put next h into a grid format
-            h_next = self.rnn.get_region_activity(h_next, *self.region_list)
-            h_next = self._reduce_traj(h_next)
+            state_next = self.rnn.get_region_activity(state_next, *self.region_list)
+            state_next = self._reduce_traj(state_next)
 
             # Compute velocities between gathered trajectory of grid and original grid values
-            x_vel, y_vel = self._compute_velocity(h_next, low_dim_grid)
+            x_vel, y_vel = self._compute_velocity(state_next, low_dim_grid)
             speed = self._compute_speed(x_vel, y_vel)
 
             x_vel, y_vel, low_dim_grid, speed = self._reshape_vals(

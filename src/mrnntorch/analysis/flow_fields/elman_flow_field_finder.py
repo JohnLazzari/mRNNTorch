@@ -82,7 +82,7 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
     def find_nonlinear_flow(
         self,
         states: torch.Tensor,
-        inp: torch.Tensor,
+        input: torch.Tensor,
         stim_input: torch.Tensor | None = None,
         W: torch.Tensor | None = None,
     ) -> list:
@@ -114,13 +114,13 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
             stim_input = torch.zeros_like(states, dtype=self.dtype)
 
         # Reshape to nxd
-        states, inp, stim_input = (
+        states, input, stim_input = (
             self._nxd(states),
-            self._nxd(inp),
+            self._nxd(input),
             self._nxd(stim_input),
         )
 
-        assert states.shape[0] == inp.shape[0]
+        assert states.shape[0] == input.shape[0]
         n_states = states.shape[0]
 
         """
@@ -147,7 +147,7 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
         for n in range(n_states):
             # default for static states
             reduced_traj_n = reduced_traj[n]
-            inp_n = inp[n]
+            input_n = input[n]
             static_states_n = static_states[n] if static_states is not None else None
             stim_input_n = stim_input[n]
 
@@ -175,7 +175,7 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
             else:
                 static_act_batch = None
 
-            full_inp_batch = inp_n.repeat(low_dim_grid.shape[0], 1)
+            full_input_batch = input_n.repeat(low_dim_grid.shape[0], 1)
             full_stim_batch = stim_input_n.repeat(low_dim_grid.shape[0], 1)
 
             # Combine the grid and static states to treat excluded regions as input
@@ -192,7 +192,7 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
             with torch.no_grad():
                 # Get activity for current timestep
                 h_next = self.rnn(
-                    full_inp_batch.unsqueeze(self.time_dim),
+                    full_input_batch.unsqueeze(self.time_dim),
                     h_0_flow,
                     stim_input=full_stim_batch.unsqueeze(self.time_dim),
                     noise=False,
@@ -219,8 +219,8 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
     def find_linear_flow(
         self,
         states: torch.Tensor,
-        inp: torch.Tensor,
-        delta_inp: torch.Tensor,
+        input: torch.Tensor,
+        delta_input: torch.Tensor,
         delta_h_static: torch.Tensor | None = None,
     ) -> list:
         """Compute linearized 2D flow fields around sampled trajectory states.
@@ -241,10 +241,14 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
         """
 
         # reshape to nxd
-        states, inp, delta_inp = self._nxd(states), self._nxd(inp), self._nxd(delta_inp)
+        states, input, delta_input = (
+            self._nxd(states),
+            self._nxd(input),
+            self._nxd(delta_input),
+        )
 
-        assert inp.shape[0] == delta_inp.shape[0]
-        assert states.shape[0] == inp.shape[0]
+        assert input.shape[0] == delta_input.shape[0]
+        assert states.shape[0] == input.shape[0]
         n_states = states.shape[0]
 
         # Lists for x and y velocities
@@ -261,8 +265,8 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
         for n in range(n_states):
             states_n = states[n]
             reduced_traj_n = reduced_traj[n]
-            inp_n = inp[n]
-            delta_inp_n = delta_inp[n]
+            input_n = input[n]
+            delta_input_n = delta_input[n]
             delta_h_static_n = delta_h_static[n] if delta_h_static is not None else None
 
             # If follow trajectory is true get grid centered around current t
@@ -290,9 +294,9 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
 
             with torch.no_grad():
                 h_next = self.linearization(
-                    inp_n,
+                    input_n,
                     states_n,
-                    delta_inp_n,
+                    delta_input_n,
                     delta_h,
                     delta_h_static=delta_h_static_n,
                 )

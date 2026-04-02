@@ -77,17 +77,29 @@ def _build_elman_mrnn_with_inputs(activation="relu") -> ElmanmRNN:
 # -------------- Testing leaky mRNN --------------------
 
 
-def test_linear_jacobian_matches_weight_l():
+def test_jacobian_matches_weight_x_l():
     """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
-    mrnn = _build_leaky_mrnn_with_inputs(activation="linear")
+    mrnn = _build_leaky_mrnn_with_inputs(activation="relu")
     lin = mLinearization(mrnn)
-    x = torch.zeros(3)
+    x = torch.ones(3)
     inp = torch.zeros(1)
     jac, jac_inp = lin.jacobian(inp, x)
     assert torch.allclose(
         jac, (1 - mrnn.alpha) * torch.eye(3) + mrnn.alpha * mrnn.W_rec.squeeze()
     )
     assert torch.allclose(jac_inp, mrnn.alpha * mrnn.W_inp.squeeze())
+
+
+def test_jacobian_matches_weight_h_l():
+    """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
+    mrnn = _build_leaky_mrnn_with_inputs(activation="relu")
+    lin = mLinearization(mrnn)
+    x = torch.tensor([1.0, 1.0, -1.0])
+    h = torch.tensor([1.0, 1.0, 0.0])
+    inp = torch.zeros(1)
+    jac, jac_inp = lin.jacobian(inp, x, h=h, dh=True)
+    assert torch.allclose(jac, torch.diag(h) @ (mrnn.alpha * mrnn.W_rec.squeeze()))
+    assert torch.allclose(jac_inp, torch.diag(h) @ (mrnn.alpha * mrnn.W_inp.squeeze()))
 
 
 def test_eigendecomposition_returns_real_imag_parts_l():

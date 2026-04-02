@@ -44,14 +44,20 @@ class mLinearization:
         input: torch.Tensor,
         x: torch.Tensor,
         delta_input: torch.Tensor,
-        delta_h: torch.Tensor,
+        delta_state: torch.Tensor,
+        delta_state_static: torch.Tensor | None = None,
         h: torch.Tensor | None = None,
-        delta_h_static: torch.Tensor | None = None,
         dh: bool = False,
     ) -> torch.Tensor:
         """Alias for :meth:`forward`."""
         return self.forward(
-            input, x, delta_input, delta_h, h=h, delta_h_static=delta_h_static, dh=dh
+            input,
+            x,
+            delta_input,
+            delta_state,
+            delta_state_static=delta_state_static,
+            h=h,
+            dh=dh,
         )
 
     def forward(
@@ -59,9 +65,9 @@ class mLinearization:
         input: torch.Tensor,
         x: torch.Tensor,
         delta_input: torch.Tensor,
-        delta_h: torch.Tensor,
+        delta_state: torch.Tensor,
+        delta_state_static: torch.Tensor | None = None,
         h: torch.Tensor | None = None,
-        delta_h_static: torch.Tensor | None = None,
         dh: bool = False,
     ) -> torch.Tensor:
         """Evaluate the first-order Taylor approximation of the leaky dynamics.
@@ -70,12 +76,13 @@ class mLinearization:
             input (torch.Tensor): External input at the operating point.
             x (torch.Tensor): Pre-activation state about which to linearize.
             delta_input (torch.Tensor): Input perturbation.
-            delta_h (torch.Tensor): Perturbation for the included region subset.
-            h (torch.Tensor | None): Activation corresponding to ``x`` when
+            delta_state (torch.Tensor): Perturbation for the state of the included \
+                region subset. Should be x perturbations or h perturbations if dh=True
+            h (torch.Tensor | None): Activation corresponding to ``x`` when \
                 linearizing hidden activations directly.
-            delta_h_static (torch.Tensor | None): Perturbation applied to excluded
+            delta_h_static (torch.Tensor | None): Perturbation applied to excluded \
                 regions when only a subset of regions is linearized.
-            dh (bool): If ``True``, linearize the hidden activation update instead
+            dh (bool): If ``True``, linearize the hidden activation update instead \
                 of the pre-activation update.
 
         Returns:
@@ -89,14 +96,17 @@ class mLinearization:
         if h is not None:
             assert h.dim() == 1
 
-        if delta_h.dim() > 1:
-            delta_h = delta_h.flatten(start_dim=0, end_dim=-2)
+        # Flatten delta since it can be batched
+        if delta_state.dim() > 1:
+            delta_state = delta_state.flatten(start_dim=0, end_dim=-2)
 
         # Get jacobians for included regions
         _jacobian, _jacobian_inp = self.jacobian(input, x, h=h, dh=dh)
         if len(self.static_region_list) >= 1:
             # Get jacobians for excluded regions if available
-            _jacobian_exc, _ = self.jacobian(input, x, h, excluded_regions=True, dh=dh)
+            _jacobian_exc, _ = self.jacobian(
+                input, x, excluded_regions=True, h=h, dh=dh
+            )
         else:
             _jacobian_exc = None
 
@@ -116,18 +126,18 @@ class mLinearization:
         if delta_input.shape == (1,) and _jacobian_inp.dim() == 1:
             _jacobian_inp = _jacobian_inp.unsqueeze(1)
 
-        if _jacobian_exc is None or delta_h_static is None:
+        if _jacobian_exc is None or delta_state_static is None:
             pert = (
                 out.squeeze(0)
-                + (_jacobian @ delta_h.T).T
-                + (_jacobian_inp @ delta_input.T).T
+                + (_jacobian @ delta_state.T).T
+                + (_jacobian_inp @ delta_input)
             )
         else:
             pert = (
                 out.squeeze(0)
-                + (_jacobian @ delta_h.T).T
-                + (_jacobian_exc @ delta_h_static.T).T
-                + (_jacobian_inp @ delta_input.T).T
+                + (_jacobian @ delta_state.T).T
+                + (_jacobian_exc @ delta_state_static)
+                + (_jacobian_inp @ delta_input)
             )
 
         return pert
@@ -136,8 +146,8 @@ class mLinearization:
         self,
         input: torch.Tensor,
         x: torch.Tensor,
-        h: torch.Tensor | None = None,
         excluded_regions: bool = False,
+        h: torch.Tensor | None = None,
         dh: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Return Jacobians of the leaky update with respect to state and input.
@@ -172,7 +182,9 @@ class mLinearization:
         x = x.unsqueeze(0)
 
         if h is not None and not dh:
-            warnings.warn("Provided h will be ignored since dh is False. If you want to include h, set dh to True.")
+            warnings.warn(
+                "Provided h will be ignored since dh is False. If you want to include h, set dh to True."
+            )
 
         # Only pay attention to h if dh is true
         # if dh is False, h will be ignored

@@ -104,14 +104,14 @@ class emLinearization:
             pert = (
                 h_next.squeeze(0)
                 + (_jacobian @ delta_h.T).T
-                + (_jacobian_inp @ delta_input.T).T
+                + (_jacobian_inp @ delta_input)
             )
         else:
             pert = (
                 h_next.squeeze(0)
                 + (_jacobian @ delta_h.T).T
-                + (_jacobian_exc @ delta_h_static.T).T
-                + (_jacobian_inp @ delta_input.T).T
+                + (_jacobian_exc @ delta_h_static)
+                + (_jacobian_inp @ delta_input)
             )
 
         return pert
