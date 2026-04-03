@@ -307,7 +307,6 @@ class mFlowFieldFinder(FlowFieldFinderBase[mRNN]):
                 )
 
             # Put next h into a grid format
-            state_next = self.rnn.get_region_activity(state_next, *self.region_list)
             state_next = self._reduce_traj(state_next)
 
             # Compute velocities between gathered trajectory of grid and original grid values

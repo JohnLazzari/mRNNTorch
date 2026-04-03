@@ -95,6 +95,7 @@ class emLinearization:
 
         # Get h_next for affine function
         h_next = self.rnn(inp, h)
+        h_next = self.rnn.get_region_activity(h_next, *self.region_list)
 
         # If there is only a single input there becomes a shape issue with squeezing
         if delta_input.shape == (1,) and _jacobian_inp.dim() == 1:
@@ -157,6 +158,11 @@ class emLinearization:
         _jacobian = h_jacobian_h
         _jacobian_input = h_jacobian_input
 
+        # Squeeze values now to get proper weight subsets
+        # TODO there may be issues here if input is one dimensional or if theres a single neuron
+        _jacobian = _jacobian.squeeze()
+        _jacobian_input = _jacobian_input.squeeze()
+
         if excluded_regions and len(self.static_region_list) >= 1:
             excluded_to_included = []
             for r_i in self.region_list:
@@ -172,7 +178,20 @@ class emLinearization:
         else:
             _jacobian = self.rnn.get_weight_subset(*self.region_list, W=_jacobian)
 
-        return _jacobian.squeeze(), _jacobian_input.squeeze()
+        # Get subsets for input jacobians
+        input_to_rec = []
+        for r_i in self.region_list:
+            input_to_region = []
+            for r_e in self.rnn.inp_dict:
+                to_start, to_end = self.rnn.get_region_indices(r_i)
+                from_start, from_end = self.rnn.get_region_indices(r_e)
+                projection = _jacobian_input[to_start:to_end, from_start:from_end]
+                input_to_region.append(projection)
+            input_to_region = torch.cat(input_to_region, dim=-1)
+            input_to_rec.append(input_to_region)
+        _jacobian_input = torch.cat(input_to_rec, dim=0)
+
+        return _jacobian, _jacobian_input
 
     def eigendecomposition(
         self,

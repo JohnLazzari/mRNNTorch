@@ -302,7 +302,6 @@ class emFlowFieldFinder(FlowFieldFinderBase[ElmanmRNN]):
                 )
 
             # Put next h into a grid format
-            h_next = self.rnn.get_region_activity(h_next, *self.region_list)
             h_next = self._reduce_traj(h_next)
 
             # Compute velocities between gathered trajectory of grid and original grid values
