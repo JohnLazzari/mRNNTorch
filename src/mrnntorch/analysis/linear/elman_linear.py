@@ -97,10 +97,6 @@ class emLinearization:
         h_next = self.rnn(inp, h)
         h_next = self.rnn.get_region_activity(h_next, *self.region_list)
 
-        # If there is only a single input there becomes a shape issue with squeezing
-        if delta_input.shape == (1,) and _jacobian_inp.dim() == 1:
-            _jacobian_inp = _jacobian_inp.unsqueeze(1)
-
         if _jacobian_exc is None or delta_h_static is None:
             pert = (
                 h_next.squeeze(0)
@@ -159,9 +155,8 @@ class emLinearization:
         _jacobian_input = h_jacobian_input
 
         # Squeeze values now to get proper weight subsets
-        # TODO there may be issues here if input is one dimensional or if theres a single neuron
-        _jacobian = _jacobian.squeeze()
-        _jacobian_input = _jacobian_input.squeeze()
+        _jacobian = self._jac_nxd(_jacobian)
+        _jacobian_input = self._jac_nxd(_jacobian_input)
 
         if excluded_regions and len(self.static_region_list) >= 1:
             excluded_to_included = []
@@ -211,7 +206,6 @@ class emLinearization:
         """
         _jacobian, _ = self.jacobian(input, h)
         eigenvalues, eigenvectors = torch.linalg.eig(_jacobian)
-
         # Split real and imaginary parts
         reals = []
         for eigenvalue in eigenvalues:
@@ -224,3 +218,19 @@ class emLinearization:
         ims = torch.tensor(ims)
 
         return reals, ims, eigenvectors
+
+    def _jac_nxd(self, jac):
+        """
+        broadcast jacobian to nxd
+        jacobian will be nxd with a bunch of extra 1 dimensional
+        squeeze all one dims, and account for single inputs/units
+        jac should never be more than 3 dims, if so there are likely other issues
+        """
+        # Squeeze values now to get proper weight subsets
+        jac = jac.squeeze()
+
+        if jac.dim() == 0:
+            jac = jac.unsqueeze(0)
+        if jac.dim() == 1:
+            jac = jac.unsqueeze(1)
+        return jac

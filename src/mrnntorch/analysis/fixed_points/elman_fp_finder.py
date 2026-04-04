@@ -200,6 +200,7 @@ class emFixedPointFinder(FixedPointFinderBase[ElmanmRNN]):
         if self.do_rerun_q_outliers:
             unique_fps = self._run_additional_iterations_on_outliers(
                 unique_fps,
+                *args,
                 stim_inp=stim_inp,
                 W_rec=W_rec,
                 n_rounds=n_rounds_q_opt,
@@ -403,7 +404,7 @@ class emFixedPointFinder(FixedPointFinderBase[ElmanmRNN]):
         )
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.25, patience=10, cooldown=0, threshold=1e-10
+            optimizer, mode="min", factor=self.lr_factor, patience=self.lr_patience, cooldown=self.lr_cooldown, threshold=1e-10
         )
 
         iter_count = 1

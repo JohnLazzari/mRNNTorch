@@ -85,9 +85,41 @@ def test_jacobian_matches_weight_x_l():
     inp = torch.zeros(1)
     jac, jac_inp = lin.jacobian(inp, x)
     assert torch.allclose(
-        jac, (1 - mrnn.alpha) * torch.eye(3) + mrnn.alpha * mrnn.W_rec.squeeze()
+        jac, (1 - mrnn.alpha) * torch.eye(3) + mrnn.alpha * mrnn.W_rec
     )
-    assert torch.allclose(jac_inp, mrnn.alpha * mrnn.W_inp.squeeze())
+    assert torch.allclose(jac_inp, mrnn.alpha * mrnn.W_inp)
+
+
+def test_jacobian_matches_weight_x_r1_l():
+    """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
+    mrnn = _build_leaky_mrnn_with_inputs(activation="relu")
+    lin = mLinearization(mrnn, "r1")
+    x = torch.ones(3)
+    inp = torch.zeros(1)
+    jac, jac_inp = lin.jacobian(inp, x)
+    assert torch.allclose(
+        jac,
+        mrnn.get_weight_subset(
+            "r1", W=(1 - mrnn.alpha) * torch.eye(3) + mrnn.alpha * mrnn.W_rec
+        ),
+    )
+    assert torch.allclose(jac_inp, (mrnn.alpha * mrnn.W_inp)[:2, :])
+
+
+def test_jacobian_matches_weight_x_r2_l():
+    """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
+    mrnn = _build_leaky_mrnn_with_inputs(activation="relu")
+    lin = mLinearization(mrnn, "r2")
+    x = torch.ones(3)
+    inp = torch.zeros(1)
+    jac, jac_inp = lin.jacobian(inp, x)
+    assert torch.allclose(
+        jac,
+        mrnn.get_weight_subset(
+            "r2", W=(1 - mrnn.alpha) * torch.eye(3) + mrnn.alpha * mrnn.W_rec
+        ),
+    )
+    assert torch.allclose(jac_inp, mrnn.alpha * mrnn.W_inp[2:, :])
 
 
 def test_jacobian_matches_weight_h_l():
@@ -97,9 +129,48 @@ def test_jacobian_matches_weight_h_l():
     x = torch.tensor([1.0, 1.0, -1.0])
     h = torch.tensor([1.0, 1.0, 0.0])
     inp = torch.zeros(1)
+    x_next, _ = mrnn(inp.unsqueeze(0).unsqueeze(0), x.unsqueeze(0))
+    x_next = x_next.squeeze()
+    dx = torch.where(x_next > 0, 1.0, 0.0)
     jac, jac_inp = lin.jacobian(inp, x, h=h, dh=True)
-    assert torch.allclose(jac, torch.diag(h) @ (mrnn.alpha * mrnn.W_rec.squeeze()))
-    assert torch.allclose(jac_inp, torch.diag(h) @ (mrnn.alpha * mrnn.W_inp.squeeze()))
+    assert torch.allclose(jac, torch.diag(dx) @ (mrnn.alpha * mrnn.W_rec))
+    assert torch.allclose(jac_inp, torch.diag(dx) @ (mrnn.alpha * mrnn.W_inp))
+
+
+def test_jacobian_matches_weight_h_r1_l():
+    """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
+    mrnn = _build_leaky_mrnn_with_inputs(activation="relu")
+    lin = mLinearization(mrnn, "r1")
+    x = torch.tensor([1.0, 1.0, -1.0])
+    h = torch.tensor([1.0, 1.0, 0.0])
+    inp = torch.zeros(1)
+    x_next, _ = mrnn(inp.unsqueeze(0).unsqueeze(0), x.unsqueeze(0))
+    x_next = x_next.squeeze()
+    dx = torch.where(x_next > 0, 1.0, 0.0)
+    jac, jac_inp = lin.jacobian(inp, x, h=h, dh=True)
+    assert torch.allclose(
+        jac,
+        mrnn.get_weight_subset("r1", W=torch.diag(dx) @ (mrnn.alpha * mrnn.W_rec)),
+    )
+    assert torch.allclose(jac_inp, (torch.diag(dx) @ (mrnn.alpha * mrnn.W_inp))[:2, :])
+
+
+def test_jacobian_matches_weight_h_r2_l():
+    """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
+    mrnn = _build_leaky_mrnn_with_inputs(activation="relu")
+    lin = mLinearization(mrnn, "r2")
+    x = torch.tensor([1.0, 1.0, -1.0])
+    h = torch.tensor([1.0, 1.0, 0.0])
+    inp = torch.zeros(1)
+    x_next, _ = mrnn(inp.unsqueeze(0).unsqueeze(0), x.unsqueeze(0))
+    x_next = x_next.squeeze()
+    dx = torch.where(x_next > 0, 1.0, 0.0)
+    jac, jac_inp = lin.jacobian(inp, x, h=h, dh=True)
+    assert torch.allclose(
+        jac,
+        mrnn.get_weight_subset("r2", W=torch.diag(dx) @ (mrnn.alpha * mrnn.W_rec)),
+    )
+    assert torch.allclose(jac_inp, (torch.diag(dx) @ (mrnn.alpha * mrnn.W_inp))[2:, :])
 
 
 def test_eigendecomposition_returns_real_imag_parts_l():
@@ -133,8 +204,40 @@ def test_linear_jacobian_matches_weight_e():
     x = torch.zeros(3)
     inp = torch.zeros(1)
     jac, jac_inp = lin.jacobian(inp, x)
-    assert torch.allclose(jac, mrnn.W_rec.squeeze())
-    assert torch.allclose(jac_inp, mrnn.W_inp.squeeze())
+    assert torch.allclose(jac, mrnn.W_rec)
+    assert torch.allclose(jac_inp, mrnn.W_inp)
+
+
+def test_jacobian_matches_weight_r1_e():
+    """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
+    mrnn = _build_elman_mrnn_with_inputs(activation="relu")
+    lin = emLinearization(mrnn, "r1")
+    h = torch.tensor([1.0, 1.0, -1.0])
+    inp = torch.zeros(1)
+    h_next = mrnn(inp.unsqueeze(0).unsqueeze(0), h.unsqueeze(0))
+    h_next = h_next.squeeze()
+    dh = torch.where(h_next > 0, 1.0, 0.0)
+    jac, jac_inp = lin.jacobian(inp, h)
+    assert torch.allclose(
+        jac, mrnn.get_weight_subset("r1", W=torch.diag(dh) @ mrnn.W_rec)
+    )
+    assert torch.allclose(jac_inp, (torch.diag(dh) @ (mrnn.W_inp))[:2, :])
+
+
+def test_jacobian_matches_weight_r2_e():
+    """Linear activation yields Jacobian equal to W_rec (scaled by alpha)."""
+    mrnn = _build_elman_mrnn_with_inputs(activation="relu")
+    lin = emLinearization(mrnn, "r2")
+    h = torch.tensor([1.0, 1.0, -1.0])
+    inp = torch.zeros(1)
+    h_next = mrnn(inp.unsqueeze(0).unsqueeze(0), h.unsqueeze(0))
+    h_next = h_next.squeeze()
+    dh = torch.where(h_next > 0, 1.0, 0.0)
+    jac, jac_inp = lin.jacobian(inp, h)
+    assert torch.allclose(
+        jac, mrnn.get_weight_subset("r2", W=torch.diag(dh) @ mrnn.W_rec)
+    )
+    assert torch.allclose(jac_inp, (torch.diag(dh) @ mrnn.W_inp)[2:, :])
 
 
 def test_eigendecomposition_returns_real_imag_parts_e():

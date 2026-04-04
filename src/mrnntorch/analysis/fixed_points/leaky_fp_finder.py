@@ -50,6 +50,8 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
 
         """
         return deepcopy(cls._default_hps)
+    
+    # TODO similar to linear and flow fields, add *args in init instead of overloaded function
 
     def __init__(
         self,
@@ -140,6 +142,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         initial_states: torch.Tensor,
         ext_inputs: torch.Tensor,
         *args,
+        optimize_h: bool = False,
         stim_inp: torch.Tensor | None = None,
         W_rec: torch.Tensor | None = None,
         n_rounds_q_opt: int = 1,
@@ -183,12 +186,20 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
             initial_states,
             ext_inputs,
             *args,
+            optimize_h=optimize_h,
             stim_inp=stim_inp,
             W_rec=W_rec,
         )
 
         # Filter out duplicates after from the first optimization round
-        unique_fps = all_fps.get_unique()
+        if optimize_h:
+            # If optimization is performed on h, get unique using Fxstar
+            # this is because Fxstar is h_next, so unique will be performed on activation
+            # This is a workaround, however keeping xstar as x is good for 
+            # when a user might want to pass the fixed point to the mrnn again (i.e. during linearization)
+            unique_fps = all_fps.get_unique(use_F_xstar=True)
+        else:
+            unique_fps = all_fps.get_unique()
 
         self._print_if_verbose("\tIdentified %d unique fixed points." % unique_fps.n)
 
@@ -200,6 +211,8 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         if self.do_rerun_q_outliers:
             unique_fps = self._run_additional_iterations_on_outliers(
                 unique_fps,
+                *args,
+                optimize_h=optimize_h,
                 stim_inp=stim_inp,
                 W_rec=W_rec,
                 n_rounds=n_rounds_q_opt,
@@ -230,6 +243,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         self,
         fps: FixedPointCollection,
         *args,
+        optimize_h: bool = False,
         n_rounds: int = 1,
         stim_inp: torch.Tensor | None = None,
         W_rec: torch.Tensor | None = None,
@@ -282,6 +296,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
                 initial_states,
                 inputs,
                 *args,
+                optimize_h=optimize_h,
                 stim_inp=stim_inp,
                 W_rec=W_rec,
             )
@@ -323,6 +338,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         initial_states: torch.Tensor,
         ext_inp: torch.Tensor,
         *args,
+        optimize_h: bool = False,
         stim_inp: torch.Tensor | None = None,
         W_rec: torch.Tensor | None = None,
     ) -> FixedPointCollection:
@@ -332,13 +348,14 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
             initial_states (torch.Tensor): Initial recurrent states to optimize.
             ext_inp (torch.Tensor): Constant external inputs paired with each state.
             *args (str): Optional recurrent regions to optimize.
+            optimize_h (bool): whether to define the loss using h_next instead of x_next
+            x_l2_scalaar (float): how to scale l2 regularization on x, only used if optimize_h
             stim_inp (torch.Tensor | None): Optional stimulus input during optimization.
             W_rec (torch.Tensor | None): Optional recurrent weight matrix override.
 
         Returns:
             FixedPointCollection: Optimized fixed points and optimization metadata.
         """
-        # TODO add option for finding fixed points on h
 
         # Get batch and time dims
         if self.batch_first:
@@ -404,7 +421,7 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         )
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.25, patience=10, cooldown=0, threshold=1e-10
+            optimizer, mode="min", factor=self.lr_factor, patience=self.lr_patience, cooldown=self.lr_cooldown, threshold=1e-10
         )
 
         iter_count = 1
@@ -415,26 +432,45 @@ class mFixedPointFinder(FixedPointFinderBase[mRNN]):
         if W_rec is not None:
             W_rec = W_rec.detach().clone()
 
+        # Begin optimization
         while True:
             x = torch.cat(region_tensor_list, dim=-1)
-
-            F_x_1xbxd, _ = self.rnn(
-                ext_inp,
-                x,
-                stim_input=stim_inp,
-                noise=False,
-                W_rec=W_rec,
-            )
+            # If optimizing over h get h_next
+            if optimize_h:
+                h = self.rnn.activation(x)
+                _, F_x_1xbxd = self.rnn(
+                    ext_inp,
+                    x,
+                    h,
+                    stim_input=stim_inp,
+                    noise=False,
+                    W_rec=W_rec,
+                )
+                state_prev = h
+            # get x_next otherwise
+            else:
+                F_x_1xbxd, _ = self.rnn(
+                    ext_inp,
+                    x,
+                    stim_input=stim_inp,
+                    noise=False,
+                    W_rec=W_rec,
+                )
+                state_prev = x
             F_x_1xbxd = F_x_1xbxd.squeeze(TIME_DIM)
 
-            x_prev = []
-            x_next = []
+            state_prev_r = []
+            state_next_r = []
             for region in args:
-                x_prev.append(self.rnn.get_region_activity(x, region))
-                x_next.append(self.rnn.get_region_activity(F_x_1xbxd, region))
-            x_prev, x_next = torch.cat(x_prev, dim=-1), torch.cat(x_next, dim=-1)
+                state_prev_r.append(self.rnn.get_region_activity(state_prev, region))
+                state_next_r.append(self.rnn.get_region_activity(F_x_1xbxd, region))
 
-            dx_bxd = x_prev - x_next
+            state_prev_r, state_next_r = (
+                torch.cat(state_prev_r, dim=-1),
+                torch.cat(state_next_r, dim=-1),
+            )
+
+            dx_bxd = state_prev_r - state_next_r
             q_b = 0.5 * torch.sum(torch.square(dx_bxd), dim=-1)
             q_scalar = torch.mean(q_b)
             dq_b = torch.abs(q_b - q_prev_b)
